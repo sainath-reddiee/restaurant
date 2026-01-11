@@ -19,7 +19,7 @@ import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 
 export default function AdminDashboard() {
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
@@ -209,13 +209,28 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="bg-gradient-to-r from-amber-600 to-orange-600 shadow-xl border-b border-amber-700">
         <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
-              <Shield className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                <Shield className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white tracking-tight">Admin Command Center</h1>
+                <p className="text-amber-100 mt-1">Super Admin Dashboard - Full Platform Control</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">Admin Command Center</h1>
-              <p className="text-amber-100 mt-1">Super Admin Dashboard - Full Platform Control</p>
+            <div className="flex items-center gap-4">
+              <div className="text-right">
+                <p className="text-white font-semibold">{profile?.full_name || 'Admin'}</p>
+                <p className="text-amber-100 text-sm">{profile?.phone}</p>
+              </div>
+              <Button
+                onClick={signOut}
+                variant="outline"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm"
+              >
+                Logout
+              </Button>
             </div>
           </div>
         </div>
