@@ -7,13 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail } from '@/lib/supabase/auth';
-import { Store, ArrowLeft, Lock } from 'lucide-react';
+import { Store, ArrowLeft, Lock, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function PartnerLoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -35,41 +36,55 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
-        const { supabase: supabaseClient } = await import('@/lib/supabase/client');
-        const { data: profile, error: profileError } = await supabaseClient
-          .from('profiles')
-          .select('role')
-          .eq('id', data.user.id)
-          .maybeSingle();
+        setIsRedirecting(true);
 
-        if (profileError) {
-          console.error('Profile fetch error:', profileError);
-        }
+        try {
+          const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+          const { data: profile, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('role')
+            .eq('id', data.user.id)
+            .maybeSingle();
 
-        if (profile?.role === 'CUSTOMER') {
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+          }
+
+          if (profile?.role === 'CUSTOMER') {
+            toast({
+              title: 'Access Denied',
+              description: 'This portal is for restaurant partners and admins only.',
+              variant: 'destructive',
+            });
+            await supabaseClient.auth.signOut();
+            setLoading(false);
+            setIsRedirecting(false);
+            return;
+          }
+
           toast({
-            title: 'Access Denied',
-            description: 'This portal is for restaurant partners and admins only.',
+            title: 'Success',
+            description: 'Signed in successfully! Redirecting...',
+          });
+
+          await new Promise(resolve => setTimeout(resolve, 800));
+
+          if (profile?.role === 'SUPER_ADMIN') {
+            window.location.href = '/admin';
+          } else if (profile?.role === 'RESTAURANT') {
+            window.location.href = '/dashboard';
+          } else {
+            window.location.href = '/';
+          }
+        } catch (err) {
+          console.error('Post-login error:', err);
+          setIsRedirecting(false);
+          setLoading(false);
+          toast({
+            title: 'Error',
+            description: 'Failed to complete login. Please try again.',
             variant: 'destructive',
           });
-          await supabaseClient.auth.signOut();
-          setLoading(false);
-          return;
-        }
-
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully! Redirecting...',
-        });
-
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-        if (profile?.role === 'SUPER_ADMIN') {
-          window.location.href = '/admin';
-        } else if (profile?.role === 'RESTAURANT') {
-          window.location.href = '/dashboard';
-        } else {
-          window.location.href = '/';
         }
       }
     } catch (error) {
@@ -136,10 +151,19 @@ export default function PartnerLoginPage() {
               <Button
                 type="submit"
                 className="w-full bg-orange-500 hover:bg-orange-600"
-                disabled={loading}
+                disabled={loading || isRedirecting}
               >
-                <Lock className="mr-2 h-4 w-4" />
-                Sign In to Dashboard
+                {(loading || isRedirecting) ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {isRedirecting ? 'Redirecting...' : 'Signing in...'}
+                  </>
+                ) : (
+                  <>
+                    <Lock className="mr-2 h-4 w-4" />
+                    Sign In to Dashboard
+                  </>
+                )}
               </Button>
             </form>
 

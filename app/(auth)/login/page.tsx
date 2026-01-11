@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } from '@/lib/supabase/auth';
-import { Mail, ArrowRight, Chrome } from 'lucide-react';
+import { Mail, ArrowRight, Chrome, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
 export default function LoginPage() {
@@ -18,6 +18,7 @@ export default function LoginPage() {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -57,6 +58,7 @@ export default function LoginPage() {
           setLoading(false);
         } else if (data.user && data.session) {
           console.log('Login successful:', data.user.id);
+          setIsRedirecting(true);
 
           try {
             const { supabase: supabaseClient } = await import('@/lib/supabase/client');
@@ -75,7 +77,7 @@ export default function LoginPage() {
               description: 'Signed in successfully! Redirecting...',
             });
 
-            await new Promise(resolve => setTimeout(resolve, 500));
+            await new Promise(resolve => setTimeout(resolve, 800));
 
             if (profile?.role) {
               switch (profile.role) {
@@ -95,7 +97,13 @@ export default function LoginPage() {
             }
           } catch (err) {
             console.error('Post-login error:', err);
-            window.location.href = '/';
+            setIsRedirecting(false);
+            setLoading(false);
+            toast({
+              title: 'Error',
+              description: 'Failed to complete login. Please try again.',
+              variant: 'destructive',
+            });
           }
         } else {
           console.error('Login failed: No user data returned');
@@ -248,10 +256,19 @@ export default function LoginPage() {
               )}
             </div>
 
-            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={loading}>
-              <Mail className="mr-2 h-4 w-4" />
-              {isSignUp ? 'Create Account' : 'Sign In'}
-              <ArrowRight className="ml-2 h-4 w-4" />
+            <Button type="submit" className="w-full bg-orange-500 hover:bg-orange-600" disabled={loading || isRedirecting}>
+              {(loading || isRedirecting) ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {isRedirecting ? 'Redirecting...' : isSignUp ? 'Creating...' : 'Signing in...'}
+                </>
+              ) : (
+                <>
+                  <Mail className="mr-2 h-4 w-4" />
+                  {isSignUp ? 'Create Account' : 'Sign In'}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </>
+              )}
             </Button>
           </form>
 
