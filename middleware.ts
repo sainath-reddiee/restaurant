@@ -6,6 +6,10 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next()
   const path = req.nextUrl.pathname
 
+  if (path === '/login' || path === '/callback' || path === '/partner') {
+    return res
+  }
+
   const allCookies = req.cookies.getAll()
   const authTokenCookie = allCookies.find(cookie =>
     cookie.name.includes('auth-token') && !cookie.name.includes('code-verifier')
@@ -13,7 +17,9 @@ export async function middleware(req: NextRequest) {
 
   if (!authTokenCookie?.value) {
     if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-      return NextResponse.redirect(new URL('/login', req.url))
+      const loginUrl = new URL('/login', req.url)
+      loginUrl.searchParams.set('redirect', path)
+      return NextResponse.redirect(loginUrl)
     }
     return res
   }
@@ -25,14 +31,18 @@ export async function middleware(req: NextRequest) {
     } catch (e) {
       console.error('Failed to parse auth token:', e);
       if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        return NextResponse.redirect(new URL('/login', req.url))
+        const loginUrl = new URL('/login', req.url)
+        loginUrl.searchParams.set('redirect', path)
+        return NextResponse.redirect(loginUrl)
       }
       return res;
     }
 
     if (!authData?.access_token) {
       if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        return NextResponse.redirect(new URL('/login', req.url))
+        const loginUrl = new URL('/login', req.url)
+        loginUrl.searchParams.set('redirect', path)
+        return NextResponse.redirect(loginUrl)
       }
       return res
     }
@@ -53,7 +63,9 @@ export async function middleware(req: NextRequest) {
 
     if (!user) {
       if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        return NextResponse.redirect(new URL('/login', req.url))
+        const loginUrl = new URL('/login', req.url)
+        loginUrl.searchParams.set('redirect', path)
+        return NextResponse.redirect(loginUrl)
       }
       return res
     }
@@ -66,7 +78,9 @@ export async function middleware(req: NextRequest) {
 
     if (!profile) {
       if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        return NextResponse.redirect(new URL('/login', req.url))
+        const loginUrl = new URL('/login', req.url)
+        loginUrl.searchParams.set('redirect', path)
+        return NextResponse.redirect(loginUrl)
       }
       return res
     }
@@ -89,7 +103,9 @@ export async function middleware(req: NextRequest) {
   } catch (error) {
     console.error('Middleware error:', error);
     if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-      return NextResponse.redirect(new URL('/login', req.url))
+      const loginUrl = new URL('/login', req.url)
+      loginUrl.searchParams.set('redirect', path)
+      return NextResponse.redirect(loginUrl)
     }
     return res
   }

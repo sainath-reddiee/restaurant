@@ -62,6 +62,9 @@ export default function LoginPage() {
 
           try {
             const { supabase: supabaseClient } = await import('@/lib/supabase/client');
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
             const { data: profile, error: profileError } = await supabaseClient
               .from('profiles')
               .select('role')
@@ -77,23 +80,23 @@ export default function LoginPage() {
               description: 'Signed in successfully! Redirecting...',
             });
 
-            await new Promise(resolve => setTimeout(resolve, 800));
+            await new Promise(resolve => setTimeout(resolve, 1000));
 
             if (profile?.role) {
               switch (profile.role) {
                 case 'SUPER_ADMIN':
-                  window.location.href = '/admin';
+                  router.push('/admin');
                   break;
                 case 'RESTAURANT':
-                  window.location.href = '/dashboard';
+                  router.push('/dashboard');
                   break;
                 case 'CUSTOMER':
                 default:
-                  window.location.href = '/';
+                  router.push('/');
                   break;
               }
             } else {
-              window.location.href = '/';
+              router.push('/');
             }
           } catch (err) {
             console.error('Post-login error:', err);
