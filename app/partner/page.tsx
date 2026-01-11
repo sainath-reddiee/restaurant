@@ -96,13 +96,13 @@ export default function PartnerLoginPage() {
           description: 'Signed in successfully!',
         });
 
-        // FIX: Small delay only to show success toast, then navigate directly
-        // Client-side navigation with router.replace() doesn't trigger middleware
+        // FIX: Navigate immediately after profile is loaded - minimal delay for UX
+        // Give toast time to render but don't block navigation
         setTimeout(() => {
           if (profile) {
             switch (profile.role) {
               case 'SUPER_ADMIN':
-                router.replace('/admin');  // Use replace to prevent back button issues
+                router.replace('/admin');
                 break;
               case 'RESTAURANT':
                 router.replace('/dashboard');
@@ -113,7 +113,7 @@ export default function PartnerLoginPage() {
           } else {
             router.replace('/');
           }
-        }, 800);  // Reduced from 2500ms to 800ms
+        }, 400);  // Minimal 400ms for toast visibility
       }
     } catch (error) {
       console.error('Login error:', error);

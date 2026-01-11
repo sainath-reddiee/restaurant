@@ -7,16 +7,19 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname
 
   const allCookies = req.cookies.getAll()
+
+  // FIX: Look for Supabase auth token with correct naming pattern
+  // Supabase uses: sb-<project-ref>-auth-token or sb-localhost-auth-token
   const authTokenCookie = allCookies.find(cookie =>
-    cookie.name.includes('auth-token') && !cookie.name.includes('code-verifier')
+    (cookie.name.startsWith('sb-') && cookie.name.includes('-auth-token')) &&
+    !cookie.name.includes('code-verifier')
   )
 
+  // FIX: For protected routes, allow client-side auth check instead of forcing middleware redirect
+  // This prevents redirect loops and allows AuthProvider to handle session
   if (!authTokenCookie?.value) {
-    if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-      const loginUrl = new URL('/login', req.url)
-      loginUrl.searchParams.set('redirect', path)
-      return NextResponse.redirect(loginUrl)
-    }
+    // Let the client-side handle authentication for these routes
+    // The AuthProvider and page components will redirect if needed
     return res
   }
 
@@ -25,21 +28,11 @@ export async function middleware(req: NextRequest) {
     try {
       authData = JSON.parse(authTokenCookie.value);
     } catch (e) {
-      console.error('Failed to parse auth token:', e);
-      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        const loginUrl = new URL('/login', req.url)
-        loginUrl.searchParams.set('redirect', path)
-        return NextResponse.redirect(loginUrl)
-      }
+      // Invalid cookie, let client-side handle it
       return res;
     }
 
     if (!authData?.access_token) {
-      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        const loginUrl = new URL('/login', req.url)
-        loginUrl.searchParams.set('redirect', path)
-        return NextResponse.redirect(loginUrl)
-      }
       return res
     }
 
@@ -58,14 +51,10 @@ export async function middleware(req: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser(authData.access_token)
 
     if (!user) {
-      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        const loginUrl = new URL('/login', req.url)
-        loginUrl.searchParams.set('redirect', path)
-        return NextResponse.redirect(loginUrl)
-      }
       return res
     }
 
+    // Only check role-based authorization, don't redirect to login
     const { data: profile } = await supabase
       .from('profiles')
       .select('role')
@@ -73,16 +62,12 @@ export async function middleware(req: NextRequest) {
       .maybeSingle()
 
     if (!profile) {
-      if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-        const loginUrl = new URL('/login', req.url)
-        loginUrl.searchParams.set('redirect', path)
-        return NextResponse.redirect(loginUrl)
-      }
       return res
     }
 
     const role = profile.role
 
+    // Only enforce role-based redirects
     if (path.startsWith('/admin')) {
       if (role !== 'SUPER_ADMIN') {
         return NextResponse.redirect(new URL('/', req.url))
@@ -98,11 +83,7 @@ export async function middleware(req: NextRequest) {
     return res
   } catch (error) {
     console.error('Middleware error:', error);
-    if (path.startsWith('/admin') || path.startsWith('/dashboard') || path.startsWith('/profile')) {
-      const loginUrl = new URL('/login', req.url)
-      loginUrl.searchParams.set('redirect', path)
-      return NextResponse.redirect(loginUrl)
-    }
+    // Let client-side handle errors
     return res
   }
 }

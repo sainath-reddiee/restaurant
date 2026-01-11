@@ -38,13 +38,15 @@ export default function AdminDashboard() {
     slug: '',
   });
 
-  // FIX: Prevent infinite redirect loops by only redirecting once when auth check completes
-  // Do not redirect if still loading to avoid race conditions
+  // FIX: Proper authentication check with redirect to login or homepage
   useEffect(() => {
     if (!authLoading) {
-      // Only redirect if we definitively know user is not authorized
-      if (!profile || profile.role !== 'SUPER_ADMIN') {
-        router.replace('/');  // Use replace to avoid back button issues
+      if (!profile) {
+        // Not logged in, redirect to partner login
+        router.replace('/partner');
+      } else if (profile.role !== 'SUPER_ADMIN') {
+        // Logged in but wrong role, redirect to homepage
+        router.replace('/');
       }
     }
   }, [authLoading, profile, router]);

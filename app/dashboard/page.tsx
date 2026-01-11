@@ -23,12 +23,15 @@ export default function RestaurantDashboard() {
   const [loading, setLoading] = useState(true);
   const [totalSales, setTotalSales] = useState(0);
 
-  // FIX: Prevent redirect loops by checking auth state properly
-  // Only redirect when auth loading is complete and user is unauthorized
+  // FIX: Proper authentication check with redirect to login or homepage
   useEffect(() => {
     if (!authLoading) {
-      if (!profile || profile.role !== 'RESTAURANT') {
-        router.replace('/');  // Use replace to prevent back button issues
+      if (!profile) {
+        // Not logged in, redirect to partner login
+        router.replace('/partner');
+      } else if (profile.role !== 'RESTAURANT') {
+        // Logged in but wrong role, redirect to homepage
+        router.replace('/');
       }
     }
   }, [authLoading, profile, router]);
