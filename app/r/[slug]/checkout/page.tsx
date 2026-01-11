@@ -219,11 +219,27 @@ export default function CheckoutPage() {
 
           if (profileError) {
             console.error('Failed to create guest profile:', profileError);
-            customerId = guestUserId;
-          } else {
-            customerId = newProfile.id;
+            toast({
+              title: 'Error',
+              description: 'Failed to create guest profile. Please try again or login.',
+              variant: 'destructive',
+            });
+            setSubmitting(false);
+            return;
           }
+
+          customerId = newProfile.id;
         }
+      }
+
+      if (!customerId) {
+        toast({
+          title: 'Error',
+          description: 'Unable to identify customer. Please try again.',
+          variant: 'destructive',
+        });
+        setSubmitting(false);
+        return;
       }
 
       const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
@@ -284,6 +300,12 @@ export default function CheckoutPage() {
         }
       }
 
+      clearCart();
+      toast({
+        title: 'Order placed!',
+        description: `Your order ${order.short_id} has been placed successfully`,
+      });
+
       if (paymentMethod === 'PREPAID_UPI' && amountToPay > 0) {
         const upiLink = generateUPIDeepLink(
           restaurant.upi_id,
@@ -291,15 +313,12 @@ export default function CheckoutPage() {
           amountToPay,
           order.short_id
         );
-        window.location.href = upiLink;
+        setTimeout(() => {
+          window.location.href = upiLink;
+        }, 1000);
+      } else {
+        router.push(`/orders/${order.id}`);
       }
-
-      clearCart();
-      toast({
-        title: 'Order placed!',
-        description: `Your order ${order.short_id} has been placed successfully`,
-      });
-      router.push(`/orders/${order.id}`);
     } catch (error) {
       console.error('Order placement error:', error);
       toast({
