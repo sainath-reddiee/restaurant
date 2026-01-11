@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
+import { User, createClient } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
 import type { Profile } from '@/lib/supabase/types';
 
@@ -20,27 +20,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
+  const fetchProfile = async (userId: string, accessToken?: string, retryCount = 0): Promise<void> => {
     console.log('🔍 Fetching profile for user:', userId, `(attempt ${retryCount + 1})`);
+    console.log('🔐 Access token provided:', !!accessToken, 'Length:', accessToken?.length);
 
-    // Check if session cookie is available
-    const { data: sessionCheck } = await supabase.auth.getSession();
-    console.log('🔐 Session check before query:', {
-      hasSession: !!sessionCheck.session,
-      sessionUserId: sessionCheck.session?.user?.id,
-      matchesQueryId: sessionCheck.session?.user?.id === userId,
-      tokenLength: sessionCheck.session?.access_token?.length
-    });
+    // Create a properly configured client with the session token
+    const client = accessToken
+      ? createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+          {
+            global: {
+              headers: {
+                Authorization: `Bearer ${accessToken}`
+              }
+            }
+          }
+        )
+      : supabase;
 
-    // If session cookie not available yet and we haven't retried too many times, wait and retry
-    if (!sessionCheck.session && retryCount < 5) {
-      const delay = 200 + (retryCount * 100); // 200ms, 300ms, 400ms, 500ms, 600ms
-      console.log(`⏳ Session cookie not available yet, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-      return fetchProfile(userId, retryCount + 1);
-    }
-
-    const { data, error } = await supabase
+    const { data, error } = await client
       .from('profiles')
       .select('*')
       .eq('id', userId)
@@ -62,7 +61,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const delay = Math.pow(2, retryCount) * 100; // 100ms, 200ms, 400ms, 800ms, 1600ms
         console.log(`🔄 Session token not ready, retrying in ${delay}ms... (attempt ${retryCount + 1}/5)`);
         await new Promise(resolve => setTimeout(resolve, delay));
-        return fetchProfile(userId, retryCount + 1);
+        return fetchProfile(userId, accessToken, retryCount + 1);
       }
 
       // Non-retryable error
@@ -115,7 +114,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshProfile = async () => {
     if (user) {
-      await fetchProfile(user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      await fetchProfile(user.id, session?.access_token);
     }
   };
 
@@ -127,7 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(session?.user ?? null);
       if (session?.user) {
         console.log('👤 User found in initial session:', session.user.id);
-        fetchProfile(session.user.id);
+        fetchProfile(session.user.id, session.access_token);
       }
       setLoading(false);
     });
@@ -140,11 +140,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (session?.user) {
           console.log('👤 User authenticated:', session.user.id);
+          console.log('🎫 Access token available:', !!session.access_token, 'Length:', session.access_token?.length);
 
-          // Small delay to let cookie be written (fetchProfile has retry logic)
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-          await fetchProfile(session.user.id);
+          await fetchProfile(session.user.id, session.access_token);
         } else {
           console.log('👋 User signed out or session expired');
           setProfile(null);
