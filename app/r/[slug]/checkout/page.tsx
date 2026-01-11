@@ -35,6 +35,8 @@ export default function CheckoutPage() {
   const [gpsCoordinates, setGpsCoordinates] = useState<string | null>(null);
   const [voiceNoteUrl, setVoiceNoteUrl] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<'PREPAID_UPI' | 'COD_CASH' | 'COD_UPI_SCAN'>('COD_CASH');
+  const [useWallet, setUseWallet] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const slug = params.slug as string;
 
@@ -57,8 +59,23 @@ export default function CheckoutPage() {
       }
       fetchRestaurant();
       getLocation();
+      fetchWalletBalance();
     }
   }, [profile, slug, cartItems.length]);
+
+  const fetchWalletBalance = async () => {
+    if (!profile) return;
+
+    const { data } = await supabase
+      .from('profiles')
+      .select('wallet_balance')
+      .eq('id', profile.id)
+      .maybeSingle();
+
+    if (data) {
+      setWalletBalance(data.wallet_balance || 0);
+    }
+  };
 
   const fetchRestaurant = async () => {
     const { data } = await supabase
@@ -139,11 +156,17 @@ export default function CheckoutPage() {
       deliveryFee = restaurant?.delivery_fee || 0;
     }
 
+    const grandTotal = subtotal + deliveryFee;
+    const walletDeduction = useWallet ? Math.min(walletBalance, grandTotal) : 0;
+    const amountToPay = grandTotal - walletDeduction;
+
     return {
       subtotal: cartTotal,
       discount,
       deliveryFee,
-      total: subtotal + deliveryFee,
+      grandTotal,
+      walletDeduction,
+      amountToPay,
     };
   };
 
@@ -162,7 +185,7 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
-      const { subtotal, discount, deliveryFee, total } = calculateTotal();
+      const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
 
       const { data: shortIdData } = await supabase.rpc('generate_short_id');
 
@@ -189,7 +212,7 @@ export default function CheckoutPage() {
           voice_note_url: voiceNoteUrl || null,
           gps_coordinates: gpsCoordinates,
           delivery_address: deliveryAddress,
-          total_amount: total,
+          total_amount: grandTotal,
           delivery_fee_charged: deliveryFee,
           coupon_code: appliedCoupon?.code || null,
           discount_amount: discount,
@@ -209,11 +232,22 @@ export default function CheckoutPage() {
         return;
       }
 
-      if (paymentMethod === 'PREPAID_UPI') {
+      if (walletDeduction > 0) {
+        const { error: walletError } = await supabase
+          .from('profiles')
+          .update({ wallet_balance: walletBalance - walletDeduction })
+          .eq('id', profile.id);
+
+        if (walletError) {
+          console.error('Error updating wallet:', walletError);
+        }
+      }
+
+      if (paymentMethod === 'PREPAID_UPI' && amountToPay > 0) {
         const upiLink = generateUPIDeepLink(
           restaurant.upi_id,
           restaurant.name,
-          total,
+          amountToPay,
           order.short_id
         );
         window.location.href = upiLink;
@@ -248,7 +282,7 @@ export default function CheckoutPage() {
     return null;
   }
 
-  const { subtotal, discount, deliveryFee, total } = calculateTotal();
+  const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -293,11 +327,59 @@ export default function CheckoutPage() {
             </div>
             <Separator />
             <div className="flex justify-between font-bold text-lg">
-              <span>Total</span>
-              <span>{formatPrice(total)}</span>
+              <span>Grand Total</span>
+              <span>{formatPrice(grandTotal)}</span>
             </div>
+            {useWallet && walletDeduction > 0 && (
+              <>
+                <div className="flex justify-between text-green-600">
+                  <span>Wallet Used</span>
+                  <span>-{formatPrice(walletDeduction)}</span>
+                </div>
+                <Separator />
+                <div className="flex justify-between font-bold text-lg text-orange-600">
+                  <span>Amount to Pay</span>
+                  <span>{formatPrice(amountToPay)}</span>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
+
+{walletBalance > 0 && (
+          <Card className="mb-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-green-600" />
+                Use Wallet Balance
+              </CardTitle>
+              <CardDescription>
+                Available balance: {formatPrice(walletBalance)}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center space-x-2 p-4 border rounded-lg bg-green-50 border-green-200">
+                <input
+                  type="checkbox"
+                  id="use-wallet"
+                  checked={useWallet}
+                  onChange={(e) => setUseWallet(e.target.checked)}
+                  className="h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500"
+                />
+                <Label htmlFor="use-wallet" className="cursor-pointer flex-1">
+                  <div className="font-semibold">
+                    Use Wallet Balance ({formatPrice(Math.min(walletBalance, grandTotal))})
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {walletBalance >= grandTotal
+                      ? 'Your wallet will cover the full amount!'
+                      : `Reduce your payment by ${formatPrice(walletBalance)}`}
+                  </div>
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {!appliedCoupon ? (
           <Card className="mb-6">
@@ -417,7 +499,9 @@ export default function CheckoutPage() {
               Placing Order...
             </>
           ) : (
-            <>Place Order • {formatPrice(total)}</>
+            <>
+              Place Order • {amountToPay === 0 ? 'FREE (Wallet)' : formatPrice(amountToPay)}
+            </>
           )}
         </Button>
       </div>
