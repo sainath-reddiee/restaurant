@@ -37,6 +37,8 @@ export default function CheckoutPage() {
   const [paymentMethod, setPaymentMethod] = useState<'PREPAID_UPI' | 'COD_CASH' | 'COD_UPI_SCAN'>('COD_CASH');
   const [useWallet, setUseWallet] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [guestPhone, setGuestPhone] = useState('');
+  const [guestName, setGuestName] = useState('');
 
   const slug = params.slug as string;
 
@@ -177,13 +179,12 @@ export default function CheckoutPage() {
       return;
     }
 
-    if (!profile) {
+    if (!profile && !guestPhone.trim()) {
       toast({
-        title: 'Login Required',
-        description: 'Please login to complete your order',
+        title: 'Phone required',
+        description: 'Please enter your phone number for delivery updates',
         variant: 'destructive',
       });
-      router.push(`/login?redirect=/r/${slug}/checkout`);
       return;
     }
 
@@ -192,6 +193,39 @@ export default function CheckoutPage() {
     setSubmitting(true);
 
     try {
+      let customerId = profile?.id;
+
+      if (!profile) {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('phone', guestPhone)
+          .maybeSingle();
+
+        if (existingProfile) {
+          customerId = existingProfile.id;
+        } else {
+          const guestUserId = crypto.randomUUID();
+          const { data: newProfile, error: profileError } = await supabase
+            .from('profiles')
+            .insert({
+              id: guestUserId,
+              role: 'CUSTOMER',
+              phone: guestPhone,
+              full_name: guestName || 'Guest',
+            })
+            .select()
+            .single();
+
+          if (profileError) {
+            console.error('Failed to create guest profile:', profileError);
+            customerId = guestUserId;
+          } else {
+            customerId = newProfile.id;
+          }
+        }
+      }
+
       const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
 
       const { data: shortIdData } = await supabase.rpc('generate_short_id');
@@ -213,7 +247,7 @@ export default function CheckoutPage() {
         .insert({
           short_id: shortIdData || `ANT-${Date.now()}`,
           restaurant_id: restaurant.id,
-          customer_id: profile.id,
+          customer_id: customerId,
           status: 'PENDING',
           payment_method: paymentMethod,
           voice_note_url: voiceNoteUrl || null,
@@ -239,7 +273,7 @@ export default function CheckoutPage() {
         return;
       }
 
-      if (walletDeduction > 0) {
+      if (walletDeduction > 0 && profile) {
         const { error: walletError } = await supabase
           .from('profiles')
           .update({ wallet_balance: walletBalance - walletDeduction })
@@ -434,6 +468,31 @@ export default function CheckoutPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {!profile && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="guest-phone">Phone Number *</Label>
+                  <Input
+                    id="guest-phone"
+                    type="tel"
+                    placeholder="Enter your phone number"
+                    value={guestPhone}
+                    onChange={(e) => setGuestPhone(e.target.value)}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">Required for delivery updates</p>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="guest-name">Name (Optional)</Label>
+                  <Input
+                    id="guest-name"
+                    placeholder="Enter your name"
+                    value={guestName}
+                    onChange={(e) => setGuestName(e.target.value)}
+                  />
+                </div>
+              </>
+            )}
             <div className="space-y-2">
               <Label htmlFor="address">Delivery Address *</Label>
               <Textarea
