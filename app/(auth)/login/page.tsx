@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { signInWithEmail, signUpWithEmail, signInWithGoogle } from '@/lib/supabase/auth';
+import { signInWithEmail, signUpWithEmail, signInWithGoogle, resetPassword } from '@/lib/supabase/auth';
 import { Mail, ArrowRight, Chrome } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -17,6 +17,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -47,18 +48,28 @@ export default function LoginPage() {
         const { data, error } = await signInWithEmail(email, password);
 
         if (error) {
+          console.error('Login error:', error);
           toast({
-            title: 'Error',
-            description: error.message,
+            title: 'Login Failed',
+            description: error.message || 'Invalid email or password. Please try again.',
             variant: 'destructive',
           });
           setLoading(false);
         } else if (data.user) {
+          console.log('Login successful:', data.user.id);
           toast({
             title: 'Success',
-            description: 'Signed in successfully!',
+            description: 'Signed in successfully! Redirecting...',
           });
           window.location.href = '/';
+        } else {
+          console.error('Login failed: No user data returned');
+          toast({
+            title: 'Login Failed',
+            description: 'Unable to sign in. Please try again.',
+            variant: 'destructive',
+          });
+          setLoading(false);
         }
       }
     } catch (error) {
@@ -89,6 +100,43 @@ export default function LoginPage() {
         description: 'Failed to sign in with Google.',
         variant: 'destructive',
       });
+      setLoading(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!email) {
+      toast({
+        title: 'Error',
+        description: 'Please enter your email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await resetPassword(email);
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: 'Password reset link sent to your email!',
+        });
+        setShowResetPassword(false);
+      }
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to send reset link.',
+        variant: 'destructive',
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -171,6 +219,40 @@ export default function LoginPage() {
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </form>
+
+          {!isSignUp && !showResetPassword && (
+            <Button
+              type="button"
+              variant="link"
+              className="w-full text-sm text-orange-600 hover:text-orange-700"
+              onClick={() => setShowResetPassword(true)}
+              disabled={loading}
+            >
+              Forgot password?
+            </Button>
+          )}
+
+          {showResetPassword && (
+            <div className="space-y-2">
+              <Button
+                type="button"
+                className="w-full bg-orange-500 hover:bg-orange-600"
+                onClick={handleResetPassword}
+                disabled={loading}
+              >
+                Send Reset Link
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowResetPassword(false)}
+                disabled={loading}
+              >
+                Back to Sign In
+              </Button>
+            </div>
+          )}
 
           <div className="relative">
             <div className="absolute inset-0 flex items-center">

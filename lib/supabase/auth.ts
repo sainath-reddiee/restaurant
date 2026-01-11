@@ -38,6 +38,13 @@ export async function signOut() {
   return { error };
 }
 
+export async function resetPassword(email: string) {
+  const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/login`,
+  });
+  return { data, error };
+}
+
 export async function getCurrentUser() {
   const { data: { user }, error } = await supabase.auth.getUser();
   return { user, error };
