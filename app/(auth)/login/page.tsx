@@ -42,8 +42,9 @@ export default function LoginPage() {
           setIsSignUp(false);
           setPassword('');
         }
+        setLoading(false);
       } else {
-        const { error } = await signInWithEmail(email, password);
+        const { data, error } = await signInWithEmail(email, password);
 
         if (error) {
           toast({
@@ -51,8 +52,13 @@ export default function LoginPage() {
             description: error.message,
             variant: 'destructive',
           });
-        } else {
-          router.push('/');
+          setLoading(false);
+        } else if (data.user) {
+          toast({
+            title: 'Success',
+            description: 'Signed in successfully!',
+          });
+          window.location.href = '/';
         }
       }
     } catch (error) {
@@ -61,7 +67,6 @@ export default function LoginPage() {
         description: 'Something went wrong. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };
