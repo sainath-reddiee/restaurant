@@ -20,27 +20,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
-    let { data, error } = await supabase
+  const fetchProfile = async (userId: string, retryCount = 0): Promise<void> => {
+    // Verify session exists before querying
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) {
+      console.error('❌ No session available for profile query');
+      // Retry up to 3 times with exponential backoff
+      if (retryCount < 3) {
+        const delay = Math.pow(2, retryCount) * 100; // 100ms, 200ms, 400ms
+        console.log(`Retrying profile fetch in ${delay}ms... (attempt ${retryCount + 1}/3)`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return fetchProfile(userId, retryCount + 1);
+      }
+      return;
+    }
+
+    console.log('🔍 Fetching profile for user:', userId);
+    console.log('📝 Session exists:', !!session, 'Token length:', session.access_token?.length);
+
+    const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
       .maybeSingle();
 
-    // FIX: Check for errors first before assuming profile doesn't exist
+    // Check for RLS errors specifically
     if (error) {
-      console.error('Error fetching profile:', error);
+      console.error('❌ Error fetching profile:', error);
+
+      if (error.message?.includes('RLS') || error.message?.includes('policy') || error.code === 'PGRST301') {
+        console.error('🚨 RLS POLICY VIOLATION - Session token may not be attached properly');
+        console.error('Session user ID:', session.user?.id);
+        console.error('Querying for ID:', userId);
+        console.error('IDs match:', session.user?.id === userId);
+      }
+
       return;
     }
 
     if (data) {
-      console.log('Profile loaded successfully:', data);
+      console.log('✅ Profile loaded successfully:', {
+        id: data.id,
+        role: data.role,
+        fullName: data.full_name,
+        phone: data.phone
+      });
       setProfile(data);
       return;
     }
 
     // Only create profile if there's NO error AND NO data (profile truly doesn't exist)
-    console.log('Profile not found, creating one...');
+    console.log('⚠️ Profile not found, creating one...');
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const phone = user.phone || user.user_metadata?.phone || user.email || '';
@@ -59,10 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .maybeSingle();
 
       if (newProfile) {
-        console.log('Profile created successfully');
+        console.log('✅ Profile created successfully');
         setProfile(newProfile);
       } else {
-        console.error('Error creating profile:', createError);
+        console.error('❌ Error creating profile:', createError);
       }
     }
   };
@@ -74,27 +105,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
+    console.log('🚀 AuthProvider: Initializing...');
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      console.log('📦 Initial session check:', !!session);
       setUser(session?.user ?? null);
       if (session?.user) {
+        console.log('👤 User found in initial session:', session.user.id);
         fetchProfile(session.user.id);
       }
       setLoading(false);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      console.log('🔔 Auth state changed:', event, 'Session exists:', !!session);
+
       (async () => {
         setUser(session?.user ?? null);
+
         if (session?.user) {
+          console.log('👤 User authenticated:', session.user.id);
+
+          // Give Supabase client time to attach the session token
+          // This is critical for RLS policies to work
+          await new Promise(resolve => setTimeout(resolve, 150));
+
           await fetchProfile(session.user.id);
         } else {
+          console.log('👋 User signed out or session expired');
           setProfile(null);
         }
+
         setLoading(false);
       })();
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log('🛑 AuthProvider: Cleaning up subscription');
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleSignOut = async () => {

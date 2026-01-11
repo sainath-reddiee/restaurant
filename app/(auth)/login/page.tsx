@@ -22,11 +22,14 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
+    console.log('🔐 Starting login process...');
+    console.log('📧 Email:', email);
+
     try {
       const { data, error } = await signInWithEmail(email, password);
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         toast({
           title: 'Login Failed',
           description: error.message || 'Invalid email or password. Please try again.',
@@ -37,7 +40,7 @@ export default function LoginPage() {
       }
 
       if (!data.user || !data.session) {
-        console.error('Login failed: No user data returned');
+        console.error('❌ Login failed: No user data returned');
         toast({
           title: 'Login Failed',
           description: 'Unable to sign in. Please try again.',
@@ -47,22 +50,31 @@ export default function LoginPage() {
         return;
       }
 
-      console.log('Login successful:', data.user.id);
+      console.log('✅ Login successful!');
+      console.log('👤 User ID:', data.user.id);
+      console.log('🎫 Session token length:', data.session.access_token?.length);
+      console.log('⏰ Session expires at:', new Date(data.session.expires_at! * 1000).toLocaleString());
 
       toast({
         title: 'Success',
         description: 'Signed in successfully!',
       });
 
+      console.log('⏳ Waiting for AuthProvider to load profile...');
+
+      // Wait for toast to show and AuthProvider to process the session
       await new Promise(resolve => setTimeout(resolve, 2000));
 
+      console.log('🔄 Refreshing router...');
       router.refresh();
+
       await new Promise(resolve => setTimeout(resolve, 500));
 
       const redirectPath = new URLSearchParams(window.location.search).get('redirect') || '/';
+      console.log('🚀 Redirecting to:', redirectPath);
       router.push(redirectPath);
     } catch (error) {
-      console.error('Auth error:', error);
+      console.error('❌ Auth error:', error);
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',
