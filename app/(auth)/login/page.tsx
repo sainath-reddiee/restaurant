@@ -54,9 +54,13 @@ export default function LoginPage() {
         description: 'Signed in successfully!',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      window.location.href = '/';
+      router.refresh();
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const redirectPath = new URLSearchParams(window.location.search).get('redirect') || '/';
+      router.push(redirectPath);
     } catch (error) {
       console.error('Auth error:', error);
       toast({

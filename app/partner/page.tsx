@@ -29,21 +29,24 @@ export default function PartnerLoginPage() {
           .maybeSingle();
 
         if (profile) {
+          router.refresh();
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           switch (profile.role) {
             case 'SUPER_ADMIN':
-              window.location.href = '/admin';
+              router.push('/admin');
               return;
             case 'RESTAURANT':
-              window.location.href = '/dashboard';
+              router.push('/dashboard');
               return;
             default:
-              window.location.href = '/';
+              router.push('/');
           }
         }
       }
     };
     checkSession();
-  }, []);
+  }, [router]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -63,32 +66,35 @@ export default function PartnerLoginPage() {
       }
 
       if (data.user && data.session) {
-        toast({
-          title: 'Success',
-          description: 'Signed in successfully!',
-        });
-
         const { data: profile } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', data.user.id)
           .maybeSingle();
 
-        await new Promise(resolve => setTimeout(resolve, 1500));
+        toast({
+          title: 'Success',
+          description: 'Signed in successfully!',
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        router.refresh();
+        await new Promise(resolve => setTimeout(resolve, 500));
 
         if (profile) {
           switch (profile.role) {
             case 'SUPER_ADMIN':
-              window.location.href = '/admin';
+              router.push('/admin');
               break;
             case 'RESTAURANT':
-              window.location.href = '/dashboard';
+              router.push('/dashboard');
               break;
             default:
-              window.location.href = '/';
+              router.push('/');
           }
         } else {
-          window.location.href = '/';
+          router.push('/');
         }
       }
     } catch (error) {
