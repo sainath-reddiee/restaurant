@@ -1,5 +1,5 @@
 /*
-  # Anantapur OS Database Schema
+  # GO515 Database Schema
 
   ## Overview
   Creates the complete database schema for a Digital Storefront & Logistics OS platform
