@@ -72,25 +72,6 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
-      </div>
-    );
-  }
-
-  if (user && !profile) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-orange-500 mx-auto mb-4" />
-          <p className="text-gray-600">Setting up your account...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-gray-200 shadow-sm animate-in fade-in slide-in-from-top-4 duration-500">
@@ -146,7 +127,7 @@ export default function Home() {
       <main className="container mx-auto px-4 py-6 max-w-6xl">
         <div className="mb-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
           <h2 className="text-2xl font-bold text-gray-900 mb-2 bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text">Order Food Nearby</h2>
-          <p className="text-gray-600 text-sm mb-4 animate-in fade-in delay-150 duration-700">No login required to browse. Checkout with Google in seconds.</p>
+          <p className="text-gray-600 text-sm mb-4 animate-in fade-in delay-150 duration-700">Browse and order without login. Quick Google sign-in only at final checkout.</p>
 
           <div className="relative animate-in fade-in slide-in-from-bottom-4 delay-300 duration-700">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400 transition-colors" />

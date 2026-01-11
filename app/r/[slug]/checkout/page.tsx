@@ -181,13 +181,6 @@ export default function CheckoutPage() {
   };
 
   const placeOrder = async () => {
-    if (!profile) {
-      setShowGoogleLogin(true);
-      return;
-    }
-
-    if (!restaurant) return;
-
     if (!deliveryAddress.trim()) {
       toast({
         title: 'Address required',
@@ -196,6 +189,13 @@ export default function CheckoutPage() {
       });
       return;
     }
+
+    if (!profile) {
+      setShowGoogleLogin(true);
+      return;
+    }
+
+    if (!restaurant) return;
 
     setSubmitting(true);
 
@@ -285,7 +285,7 @@ export default function CheckoutPage() {
     }
   };
 
-  if (authLoading || loading) {
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-orange-500" />
