@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
 export async function POST(req: NextRequest) {
+  console.log('[Mock Callback] Starting callback processing...');
   try {
     const body = await req.json();
     const { merchantTransactionId, status, amount } = body;
@@ -9,7 +10,8 @@ export async function POST(req: NextRequest) {
     console.log('[Mock PhonePe Callback] Received:', {
       merchantTransactionId,
       status,
-      amount
+      amount,
+      timestamp: new Date().toISOString()
     });
 
     const supabase = createClient(
@@ -136,15 +138,19 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    console.log('[Mock Callback] Processing completed successfully');
     return NextResponse.json({
       success: true,
-      message: 'Payment processed successfully'
+      message: 'Payment processed successfully',
+      timestamp: new Date().toISOString()
     });
   } catch (error) {
-    console.error('[Mock PhonePe Callback] Error:', error);
+    console.error('[Mock PhonePe Callback] CRITICAL ERROR:', error);
+    console.error('[Mock Callback] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
     return NextResponse.json({
       success: false,
-      message: error instanceof Error ? error.message : 'Unknown error'
+      message: error instanceof Error ? error.message : 'Unknown error',
+      error: error instanceof Error ? error.toString() : String(error)
     }, { status: 500 });
   }
 }

@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        if (transaction.status === 'COMPLETED') {
+        if (transaction.status === 'APPROVED') {
           return NextResponse.json({
             success: true,
             message: 'Payment verified successfully',
@@ -107,7 +107,7 @@ export async function GET(request: NextRequest) {
         } else {
           return NextResponse.json({
             success: false,
-            error: 'Payment failed',
+            error: 'Payment failed or rejected',
           });
         }
       }

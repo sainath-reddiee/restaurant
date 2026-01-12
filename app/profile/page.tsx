@@ -40,9 +40,16 @@ interface Order {
   items: any;
 }
 
+interface Restaurant {
+  id: string;
+  credit_balance: number;
+  name: string;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [email, setEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -71,6 +78,19 @@ export default function ProfilePage() {
 
       if (profileData) {
         setProfile(profileData);
+
+        // If restaurant user, fetch restaurant data
+        if (profileData.role === 'RESTAURANT') {
+          const { data: restaurantData } = await supabase
+            .from('restaurants')
+            .select('id, credit_balance, name')
+            .eq('owner_phone', profileData.phone)
+            .maybeSingle();
+
+          if (restaurantData) {
+            setRestaurant(restaurantData);
+          }
+        }
       }
 
       const { data: ordersData } = await supabase
@@ -196,8 +216,15 @@ export default function ProfilePage() {
               <div className="text-center py-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
                 <p className="text-sm text-slate-600 mb-2">Available Balance</p>
                 <p className="text-4xl font-bold text-slate-900">
-                  {formatPrice(profile.wallet_balance)}
+                  {profile.role === 'RESTAURANT'
+                    ? formatPrice(restaurant?.credit_balance || 0)
+                    : formatPrice(profile.wallet_balance)}
                 </p>
+                {profile.role === 'RESTAURANT' && restaurant && (
+                  <p className="text-xs text-slate-500 mt-2">
+                    Restaurant: {restaurant.name}
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
