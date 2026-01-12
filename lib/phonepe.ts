@@ -66,8 +66,8 @@ export interface PhonePeCallbackResponse {
  */
 export function getPhonePeConfig(): PhonePeConfig {
   return {
-    merchantId: process.env.PHONEPE_MERCHANT_ID || 'PGTESTPAYUAT',
-    saltKey: process.env.PHONEPE_SALT_KEY || '099eb0cd-02cf-4e2a-8aca-3e6c6aff0399',
+    merchantId: process.env.PHONEPE_MERCHANT_ID || 'PGTESTPAYUAT86',
+    saltKey: process.env.PHONEPE_SALT_KEY || '96434309-7796-489d-8924-ab56988a6076',
     saltIndex: process.env.PHONEPE_SALT_INDEX || '1',
     hostUrl: process.env.PHONEPE_HOST_URL || 'https://api-preprod.phonepe.com/apis/pg-sandbox',
   };
