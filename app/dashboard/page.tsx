@@ -127,6 +127,26 @@ export default function RestaurantDashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
+    if (newStatus === 'CONFIRMED' && restaurant) {
+      const { data: feeResult, error: feeError } = await supabase
+        .rpc('deduct_restaurant_fee', {
+          p_restaurant_id: restaurant.id,
+          p_order_id: orderId,
+          p_fee_amount: restaurant.tech_fee || 10
+        });
+
+      if (feeError || !feeResult?.success) {
+        toast({
+          title: 'Error',
+          description: 'Failed to process order fee. Please contact support.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      fetchRestaurant();
+    }
+
     const { error } = await supabase
       .from('orders')
       .update({ status: newStatus, updated_at: new Date().toISOString() })
@@ -142,6 +162,29 @@ export default function RestaurantDashboard() {
       toast({
         title: 'Success',
         description: `Order status updated to ${newStatus}`,
+      });
+    }
+  };
+
+  const findRider = async (orderId: string) => {
+    const { error } = await supabase
+      .from('orders')
+      .update({
+        status: 'SEARCHING_FOR_RIDER',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', orderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Finding Rider',
+        description: 'Searching for available riders nearby...',
       });
     }
   };
@@ -433,6 +476,17 @@ export default function RestaurantDashboard() {
                         >
                           Send to WhatsApp
                         </Button>
+                      )}
+                      {(order.status === 'COOKING' || order.status === 'READY') && !order.rider_id && (
+                        <Button
+                          onClick={() => findRider(order.id)}
+                          className="bg-orange-600 hover:bg-orange-700"
+                        >
+                          Find Rider
+                        </Button>
+                      )}
+                      {order.rider_id && (
+                        <Badge className="self-center bg-green-600">Rider Assigned</Badge>
                       )}
                     </div>
                   </CardContent>

@@ -25,6 +25,7 @@ export default function RestaurantMenuPage() {
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [vegFilter, setVegFilter] = useState<'all' | 'veg' | 'non-veg'>('all');
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const slug = params.slug as string;
 
@@ -197,7 +198,7 @@ export default function RestaurantMenuPage() {
       </div>
 
       <div className="container mx-auto px-4 py-6 max-w-4xl">
-        <div className="flex items-center gap-2 mb-6 bg-white rounded-lg p-2 shadow-sm">
+        <div className="flex items-center gap-2 mb-4 bg-white rounded-lg p-2 shadow-sm">
           <Button
             variant={vegFilter === 'all' ? 'default' : 'outline'}
             size="sm"
@@ -224,6 +225,32 @@ export default function RestaurantMenuPage() {
             Non-Veg
           </Button>
         </div>
+
+        {categories.length > 0 && (
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex gap-2 pb-2">
+              <Button
+                variant={selectedCategory === null ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(null)}
+                className={selectedCategory === null ? 'bg-orange-600 hover:bg-orange-700 whitespace-nowrap' : 'whitespace-nowrap'}
+              >
+                All Categories
+              </Button>
+              {categories.map(category => (
+                <Button
+                  key={category}
+                  variant={selectedCategory === category ? 'default' : 'outline'}
+                  size="sm"
+                  onClick={() => setSelectedCategory(category)}
+                  className={selectedCategory === category ? 'bg-orange-600 hover:bg-orange-700 whitespace-nowrap' : 'whitespace-nowrap'}
+                >
+                  {category}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {lootItems.length > 0 && (
           <div className="mb-8">
@@ -299,7 +326,9 @@ export default function RestaurantMenuPage() {
           </div>
         )}
 
-        {categories.map(category => (
+        {categories
+          .filter(category => selectedCategory === null || category === selectedCategory)
+          .map(category => (
           <div key={category} className="mb-8">
             <h2 className="text-xl font-semibold mb-4">{category}</h2>
             <div className="space-y-4">

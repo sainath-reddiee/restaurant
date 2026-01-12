@@ -75,6 +75,7 @@ export interface Order {
   invoice_number: string | null;
   restaurant_id: string;
   customer_id: string;
+  rider_id?: string | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
   voice_note_url: string | null;
