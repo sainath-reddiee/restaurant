@@ -59,10 +59,25 @@ export async function POST(req: NextRequest) {
       console.log('[Mock Callback] Order updated:', order.id, 'Status:', newStatus);
     }
     // Handle wallet recharge
-    else if (merchantTransactionId.startsWith('wallet_')) {
-      // Extract user info from transaction ID or body
-      const parts = merchantTransactionId.split('_');
-      const userId = parts[parts.length - 1];
+    else if (merchantTransactionId.startsWith('RECHARGE-')) {
+      // Extract transaction ID from RECHARGE-{txnId}-{timestamp}
+      const parts = merchantTransactionId.split('-');
+      const walletTxnId = parts[1];
+
+      // Look up the wallet transaction record
+      const { data: walletTxn, error: walletTxnError } = await supabase
+        .from('wallet_transactions')
+        .select('user_id, amount, id')
+        .eq('id', walletTxnId)
+        .maybeSingle();
+
+      if (walletTxnError || !walletTxn) {
+        console.error('[Mock Callback] Error fetching wallet transaction:', walletTxnError);
+        throw walletTxnError || new Error('Wallet transaction not found');
+      }
+
+      const userId = walletTxn.user_id;
+      const rechargeAmount = walletTxn.amount;
 
       if (status === 'success') {
         const { data: profile, error: profileError } = await supabase
@@ -77,7 +92,7 @@ export async function POST(req: NextRequest) {
         }
 
         const currentBalance = profile?.wallet_balance || 0;
-        const newBalance = currentBalance + amount;
+        const newBalance = currentBalance + rechargeAmount;
 
         const { error: updateError } = await supabase
           .from('profiles')
@@ -92,23 +107,35 @@ export async function POST(req: NextRequest) {
           throw updateError;
         }
 
-        // Create wallet transaction record
-        const { error: txError } = await supabase
+        // Update wallet transaction status
+        const { error: txUpdateError } = await supabase
           .from('wallet_transactions')
-          .insert({
-            user_id: userId,
-            amount: amount,
-            type: 'credit',
-            description: `Wallet recharge - Mock Payment`,
+          .update({
+            status: 'COMPLETED',
             payment_transaction_id: merchantTransactionId,
-            status: 'completed'
-          });
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', walletTxnId);
 
-        if (txError) {
-          console.error('[Mock Callback] Error creating wallet transaction:', txError);
+        if (txUpdateError) {
+          console.error('[Mock Callback] Error updating wallet transaction:', txUpdateError);
         }
 
-        console.log('[Mock Callback] Wallet credited:', userId, 'Amount:', amount);
+        console.log('[Mock Callback] Wallet credited:', userId, 'Amount:', rechargeAmount);
+      } else {
+        // Mark transaction as failed
+        const { error: txUpdateError } = await supabase
+          .from('wallet_transactions')
+          .update({
+            status: 'FAILED',
+            payment_transaction_id: merchantTransactionId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', walletTxnId);
+
+        if (txUpdateError) {
+          console.error('[Mock Callback] Error updating wallet transaction:', txUpdateError);
+        }
       }
     }
 
