@@ -39,7 +39,7 @@ const DEFAULT_GST_CONFIG: GSTConfig = {
   foodGSTRate: 5.0,
   deliveryGSTRate: 18.0,
   platformGSTRate: 18.0,
-  isGSTInclusive: true,
+  isGSTInclusive: false, // GST is ADDED on top of base price
 };
 
 export function calculateGST(
@@ -82,8 +82,9 @@ export function calculateGST(
   const cgstAmount = totalGSTAmount / 2;
   const sgstAmount = totalGSTAmount / 2;
 
-  const subtotalAfterGST = cartTotal;
-  const deliveryFeeAfterGST = deliveryFee;
+  // Calculate totals after GST
+  const subtotalAfterGST = subtotalBeforeGST + foodGSTAmount;
+  const deliveryFeeAfterGST = deliveryFeeBeforeGST + deliveryGSTAmount;
 
   const grandTotalAfterDiscount = subtotalAfterGST + deliveryFeeAfterGST - discountAmount;
 

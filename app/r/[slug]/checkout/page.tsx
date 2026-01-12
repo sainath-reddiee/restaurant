@@ -489,13 +489,17 @@ export default function CheckoutPage() {
               </>
             )}
 
-            <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg mt-3">
-              <p className="font-medium text-blue-900 mb-1">GST Breakdown:</p>
-              <p>All prices include applicable GST as per Indian government regulations.</p>
-              {restaurant?.gst_number && (
-                <p className="mt-1">Restaurant GSTIN: {restaurant.gst_number}</p>
-              )}
-            </div>
+            {restaurant?.gst_enabled !== false && (
+              <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg mt-3">
+                <p className="font-medium text-blue-900 mb-1">GST Breakdown:</p>
+                <p>GST is added as per Indian government regulations.</p>
+                <p>Food: 5% (CGST 2.5% + SGST 2.5%)</p>
+                <p>Delivery: 18% (CGST 9% + SGST 9%)</p>
+                {restaurant?.gst_number && (
+                  <p className="mt-1">Restaurant GSTIN: {restaurant.gst_number}</p>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
