@@ -110,8 +110,19 @@ export async function initiatePhonePePayment(
   try {
     const config = getPhonePeConfig();
 
+    // Validate configuration
+    if (!config.merchantId || !config.saltKey || !config.saltIndex) {
+      throw new Error('PhonePe configuration is incomplete');
+    }
+
     // Convert amount to paise
     const amountInPaise = Math.round(amount * 100);
+
+    // Format mobile number - remove +91 if present and ensure 10 digits
+    let formattedMobile = mobileNumber.replace(/\D/g, '');
+    if (formattedMobile.startsWith('91') && formattedMobile.length === 12) {
+      formattedMobile = formattedMobile.substring(2);
+    }
 
     const paymentRequest: PhonePePaymentRequest = {
       merchantId: config.merchantId,
@@ -121,7 +132,7 @@ export async function initiatePhonePePayment(
       redirectUrl,
       redirectMode: 'REDIRECT',
       callbackUrl,
-      mobileNumber,
+      mobileNumber: formattedMobile,
       paymentInstrument: {
         type: 'PAY_PAGE',
       },
@@ -133,12 +144,21 @@ export async function initiatePhonePePayment(
     // Generate checksum
     const checksum = generateChecksum(payload, config.saltKey, config.saltIndex);
 
+    console.log('PhonePe Payment Request:', {
+      merchantId: config.merchantId,
+      transactionId,
+      amount: amountInPaise,
+      apiUrl: `${config.hostUrl}/pg/v1/pay`,
+    });
+
     // Make API call to PhonePe
     const response = await fetch(`${config.hostUrl}/pg/v1/pay`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-VERIFY': checksum,
+        'X-MERCHANT-ID': config.merchantId,
+        'accept': 'application/json',
       },
       body: JSON.stringify({
         request: payload,
@@ -147,12 +167,19 @@ export async function initiatePhonePePayment(
 
     const result: PhonePePaymentResponse = await response.json();
 
+    console.log('PhonePe API Response:', {
+      success: result.success,
+      code: result.code,
+      message: result.message,
+    });
+
     if (result.success && result.data?.instrumentResponse?.redirectInfo?.url) {
       return {
         success: true,
         redirectUrl: result.data.instrumentResponse.redirectInfo.url,
       };
     } else {
+      console.error('PhonePe Payment Failed:', result);
       return {
         success: false,
         error: result.message || 'Payment initiation failed',

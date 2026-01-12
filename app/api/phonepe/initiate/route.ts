@@ -3,8 +3,28 @@ import { initiatePhonePePayment } from '@/lib/phonepe';
 
 export async function POST(request: NextRequest) {
   try {
+    // Validate environment variables first
+    const requiredEnvVars = [
+      'PHONEPE_MERCHANT_ID',
+      'PHONEPE_SALT_KEY',
+      'PHONEPE_SALT_INDEX',
+      'PHONEPE_HOST_URL'
+    ];
+
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+      console.error('Missing PhonePe environment variables:', missingVars);
+      return NextResponse.json(
+        { success: false, error: `Missing environment variables: ${missingVars.join(', ')}` },
+        { status: 500 }
+      );
+    }
+
     const body = await request.json();
     const { amount, transactionId, mobileNumber, userId, type } = body;
+
+    console.log('PhonePe Initiate Request:', { amount, transactionId, type, userId: userId?.substring(0, 8) });
 
     // Validate required fields
     if (!amount || !transactionId || !mobileNumber || !userId || !type) {
@@ -50,12 +70,14 @@ export async function POST(request: NextRequest) {
     );
 
     if (result.success && result.redirectUrl) {
+      console.log('Payment initiated successfully:', transactionId);
       return NextResponse.json({
         success: true,
         redirectUrl: result.redirectUrl,
         transactionId,
       });
     } else {
+      console.error('Payment initiation failed:', result.error);
       return NextResponse.json(
         {
           success: false,
