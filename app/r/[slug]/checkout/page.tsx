@@ -17,6 +17,7 @@ import { VoiceRecorder } from '@/components/voice-recorder';
 import { Loader2, MapPin, Tag, CreditCard, Wallet, QrCode, ArrowLeft } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice, generateUPIDeepLink } from '@/lib/format';
+import { calculateGST, type GSTBreakdown } from '@/lib/gst-calculator';
 import Link from 'next/link';
 
 export default function CheckoutPage() {
@@ -146,29 +147,25 @@ export default function CheckoutPage() {
     setCouponCode('');
   };
 
-  const calculateTotal = () => {
+  const calculateTotal = (): GSTBreakdown => {
     const discount = appliedCoupon?.discount_value || 0;
-    const subtotal = cartTotal - discount;
 
     let deliveryFee = 0;
     if (restaurant?.free_delivery_threshold) {
-      deliveryFee = subtotal >= restaurant.free_delivery_threshold ? 0 : restaurant.delivery_fee;
+      deliveryFee = cartTotal >= restaurant.free_delivery_threshold ? 0 : restaurant.delivery_fee;
     } else {
       deliveryFee = restaurant?.delivery_fee || 0;
     }
 
-    const grandTotal = subtotal + deliveryFee;
-    const walletDeduction = useWallet ? Math.min(walletBalance, grandTotal) : 0;
-    const amountToPay = grandTotal - walletDeduction;
-
-    return {
-      subtotal: cartTotal,
-      discount,
+    const gstBreakdown = calculateGST(
+      cartTotal,
       deliveryFee,
-      grandTotal,
-      walletDeduction,
-      amountToPay,
-    };
+      discount,
+      walletBalance,
+      useWallet
+    );
+
+    return gstBreakdown;
   };
 
   const placeOrder = async () => {
@@ -244,12 +241,13 @@ export default function CheckoutPage() {
         return;
       }
 
-      const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
+      const gstBreakdown = calculateTotal();
 
       const { data: shortIdData } = await supabase.rpc('generate_short_id');
+      const { data: invoiceNumber } = await supabase.rpc('generate_invoice_number');
 
       const techFee = restaurant.tech_fee * cartItems.reduce((sum, item) => sum + item.quantity, 0);
-      const deliveryMargin = deliveryFee > 0 ? deliveryFee - 30 : 0;
+      const deliveryMargin = gstBreakdown.deliveryFeeAfterGST > 0 ? gstBreakdown.deliveryFeeAfterGST - 30 : 0;
       const netProfit = techFee + deliveryMargin;
 
       const orderItems = cartItems.map(item => ({
@@ -264,6 +262,7 @@ export default function CheckoutPage() {
         .from('orders')
         .insert({
           short_id: shortIdData || `ANT-${Date.now()}`,
+          invoice_number: invoiceNumber || `INV-${Date.now()}`,
           restaurant_id: restaurant.id,
           customer_id: customerId,
           status: 'PENDING',
@@ -271,10 +270,16 @@ export default function CheckoutPage() {
           voice_note_url: voiceNoteUrl || null,
           gps_coordinates: gpsCoordinates,
           delivery_address: deliveryAddress,
-          total_amount: grandTotal,
-          delivery_fee_charged: deliveryFee,
+          subtotal_before_gst: gstBreakdown.subtotalBeforeGST,
+          food_gst_amount: gstBreakdown.foodGSTAmount,
+          delivery_gst_amount: gstBreakdown.deliveryGSTAmount,
+          total_gst_amount: gstBreakdown.totalGSTAmount,
+          cgst_amount: gstBreakdown.cgstAmount,
+          sgst_amount: gstBreakdown.sgstAmount,
+          total_amount: gstBreakdown.grandTotal,
+          delivery_fee_charged: gstBreakdown.deliveryFeeAfterGST,
           coupon_code: appliedCoupon?.code || null,
-          discount_amount: discount,
+          discount_amount: gstBreakdown.discountAmount,
           net_profit: netProfit,
           items: orderItems,
         })
@@ -291,10 +296,10 @@ export default function CheckoutPage() {
         return;
       }
 
-      if (walletDeduction > 0 && profile) {
+      if (gstBreakdown.walletDeduction > 0 && profile) {
         const { error: walletError } = await supabase
           .from('profiles')
-          .update({ wallet_balance: walletBalance - walletDeduction })
+          .update({ wallet_balance: walletBalance - gstBreakdown.walletDeduction })
           .eq('id', profile.id);
 
         if (walletError) {
@@ -308,11 +313,11 @@ export default function CheckoutPage() {
         description: `Your order ${order.short_id} has been placed successfully`,
       });
 
-      if (paymentMethod === 'PREPAID_UPI' && amountToPay > 0) {
+      if (paymentMethod === 'PREPAID_UPI' && gstBreakdown.amountToPay > 0) {
         const upiLink = generateUPIDeepLink(
           restaurant.upi_id,
           restaurant.name,
-          amountToPay,
+          gstBreakdown.amountToPay,
           order.short_id
         );
 
@@ -326,7 +331,7 @@ export default function CheckoutPage() {
           localStorage.setItem('pending_payment', JSON.stringify({
             orderId: order.id,
             upiLink,
-            amount: amountToPay,
+            amount: gstBreakdown.amountToPay,
             restaurantUPI: restaurant.upi_id,
             restaurantName: restaurant.name,
             orderShortId: order.short_id
@@ -359,7 +364,7 @@ export default function CheckoutPage() {
     return null;
   }
 
-  const { subtotal, discount, deliveryFee, grandTotal, walletDeduction, amountToPay } = calculateTotal();
+  const totals = calculateTotal();
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -387,39 +392,95 @@ export default function CheckoutPage() {
                 <span>{formatPrice(item.selling_price * item.quantity)}</span>
               </div>
             ))}
-            <Separator />
-            <div className="flex justify-between">
-              <span>Subtotal</span>
-              <span>{formatPrice(subtotal)}</span>
+
+            <Separator className="my-3" />
+
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>Subtotal (before GST)</span>
+              <span>{formatPrice(totals.subtotalBeforeGST)}</span>
             </div>
+
+            <div className="flex justify-between text-sm text-gray-600">
+              <span>GST on Food (5%)</span>
+              <span>{formatPrice(totals.foodGSTAmount)}</span>
+            </div>
+
+            <div className="flex justify-between">
+              <span>Food Total</span>
+              <span>{formatPrice(totals.subtotalAfterGST)}</span>
+            </div>
+
+            {totals.deliveryFeeAfterGST > 0 && (
+              <>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>Delivery Fee (before GST)</span>
+                  <span>{formatPrice(totals.deliveryFeeBeforeGST)}</span>
+                </div>
+                <div className="flex justify-between text-sm text-gray-600">
+                  <span>GST on Delivery (18%)</span>
+                  <span>{formatPrice(totals.deliveryGSTAmount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Delivery Fee</span>
+                  <span>{formatPrice(totals.deliveryFeeAfterGST)}</span>
+                </div>
+              </>
+            )}
+
+            {totals.deliveryFeeAfterGST === 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Delivery Fee</span>
+                <span>FREE</span>
+              </div>
+            )}
+
             {appliedCoupon && (
               <div className="flex justify-between text-green-600">
                 <span>Discount ({appliedCoupon.code})</span>
-                <span>-{formatPrice(discount)}</span>
+                <span>-{formatPrice(totals.discountAmount)}</span>
               </div>
             )}
-            <div className="flex justify-between">
-              <span>Delivery Fee</span>
-              <span>{deliveryFee === 0 ? 'FREE' : formatPrice(deliveryFee)}</span>
+
+            <Separator className="my-3" />
+
+            <div className="flex justify-between text-sm font-medium text-gray-700 bg-gray-50 -mx-6 px-6 py-2">
+              <span>Total GST</span>
+              <span>{formatPrice(totals.totalGSTAmount)}</span>
             </div>
-            <Separator />
+
+            <div className="flex justify-between text-xs text-gray-500 -mx-6 px-6">
+              <span>CGST: {formatPrice(totals.cgstAmount)}</span>
+              <span>SGST: {formatPrice(totals.sgstAmount)}</span>
+            </div>
+
+            <Separator className="my-3" />
+
             <div className="flex justify-between font-bold text-lg">
               <span>Grand Total</span>
-              <span>{formatPrice(grandTotal)}</span>
+              <span>{formatPrice(totals.grandTotal)}</span>
             </div>
-            {useWallet && walletDeduction > 0 && (
+
+            {useWallet && totals.walletDeduction > 0 && (
               <>
                 <div className="flex justify-between text-green-600">
                   <span>Wallet Used</span>
-                  <span>-{formatPrice(walletDeduction)}</span>
+                  <span>-{formatPrice(totals.walletDeduction)}</span>
                 </div>
                 <Separator />
                 <div className="flex justify-between font-bold text-lg text-orange-600">
                   <span>Amount to Pay</span>
-                  <span>{formatPrice(amountToPay)}</span>
+                  <span>{formatPrice(totals.amountToPay)}</span>
                 </div>
               </>
             )}
+
+            <div className="text-xs text-gray-500 bg-blue-50 p-3 rounded-lg mt-3">
+              <p className="font-medium text-blue-900 mb-1">GST Breakdown:</p>
+              <p>All prices include applicable GST as per Indian government regulations.</p>
+              {restaurant?.gst_number && (
+                <p className="mt-1">Restaurant GSTIN: {restaurant.gst_number}</p>
+              )}
+            </div>
           </CardContent>
         </Card>
 
@@ -445,10 +506,10 @@ export default function CheckoutPage() {
                 />
                 <Label htmlFor="use-wallet" className="cursor-pointer flex-1">
                   <div className="font-semibold">
-                    Use Wallet Balance ({formatPrice(Math.min(walletBalance, grandTotal))})
+                    Use Wallet Balance ({formatPrice(Math.min(walletBalance, totals.grandTotal))})
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    {walletBalance >= grandTotal
+                    {walletBalance >= totals.grandTotal
                       ? 'Your wallet will cover the full amount!'
                       : `Reduce your payment by ${formatPrice(walletBalance)}`}
                   </div>
@@ -486,7 +547,7 @@ export default function CheckoutPage() {
                 <div className="flex items-center gap-2">
                   <Tag className="h-5 w-5 text-green-600" />
                   <span className="font-semibold">{appliedCoupon.code} applied!</span>
-                  <span className="text-green-600">Saved {formatPrice(discount)}</span>
+                  <span className="text-green-600">Saved {formatPrice(totals.discountAmount)}</span>
                 </div>
                 <Button variant="ghost" size="sm" onClick={removeCoupon}>
                   Remove
@@ -602,7 +663,7 @@ export default function CheckoutPage() {
             </>
           ) : (
             <>
-              Place Order • {amountToPay === 0 ? 'FREE (Wallet)' : formatPrice(amountToPay)}
+              Place Order • {totals.amountToPay === 0 ? 'FREE (Wallet)' : formatPrice(totals.amountToPay)}
             </>
           )}
         </Button>

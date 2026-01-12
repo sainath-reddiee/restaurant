@@ -29,6 +29,9 @@ export interface Restaurant {
   rating_count: number;
   credit_balance: number;
   min_balance_limit: number;
+  gst_number: string | null;
+  is_gst_registered: boolean;
+  food_gst_rate: number;
 }
 
 export interface MenuItem {
@@ -68,6 +71,7 @@ export interface OrderItem {
 export interface Order {
   id: string;
   short_id: string;
+  invoice_number: string | null;
   restaurant_id: string;
   customer_id: string;
   status: OrderStatus;
@@ -75,6 +79,12 @@ export interface Order {
   voice_note_url: string | null;
   gps_coordinates: string | null;
   delivery_address: string;
+  subtotal_before_gst: number;
+  food_gst_amount: number;
+  delivery_gst_amount: number;
+  total_gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
   total_amount: number;
   delivery_fee_charged: number;
   coupon_code: string | null;
