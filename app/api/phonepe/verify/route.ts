@@ -1,4 +1,4 @@
-// Updated: 2026-01-12 08:42 - Fixed UUID extraction logic
+// Updated: 2026-01-12 14:55 - Fixed status check to match CONFIRMED status
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPhonePePaymentStatus } from '@/lib/phonepe';
 import { createClient } from '@supabase/supabase-js';
@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
 
         const { data: order, error } = await supabase
           .from('orders')
-          .select('id, status, payment_status, payment_transaction_id, total_amount')
+          .select('id, status, payment_status, payment_transaction_id, total_amount, payment_verified')
           .or(orderId ? `payment_transaction_id.eq.${txnId},id.eq.${orderId}` : `payment_transaction_id.eq.${txnId}`)
           .maybeSingle();
 
@@ -58,14 +58,22 @@ export async function GET(request: NextRequest) {
           );
         }
 
-        if (order.payment_status === 'completed' || order.status === 'paid') {
+        console.log('[Mock Verify] Order found:', {
+          id: order.id,
+          status: order.status,
+          payment_status: order.payment_status,
+          payment_verified: order.payment_verified
+        });
+
+        // Order is confirmed and paid when status is CONFIRMED (set by callback)
+        if (order.status === 'CONFIRMED' || order.status === 'COOKING' || order.status === 'READY' || order.status === 'DELIVERED') {
           return NextResponse.json({
             success: true,
             message: 'Payment verified successfully',
             transactionId: txnId,
             amount: order.total_amount,
           });
-        } else if (order.payment_status === 'pending') {
+        } else if (order.status === 'PENDING') {
           return NextResponse.json({
             success: false,
             pending: true,
