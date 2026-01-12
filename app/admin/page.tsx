@@ -14,7 +14,7 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw, Pencil, User } from 'lucide-react';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw, Pencil, User, Bike, CheckCircle, XCircle } from 'lucide-react';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
@@ -24,6 +24,7 @@ export default function AdminDashboard() {
   const router = useRouter();
   const { toast } = useToast();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -31,6 +32,7 @@ export default function AdminDashboard() {
   const [editingRestaurantId, setEditingRestaurantId] = useState<string | null>(null);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [activeTab, setActiveTab] = useState<'restaurants' | 'riders'>('restaurants');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -60,6 +62,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (profile?.role === 'SUPER_ADMIN' && loading) {
       fetchRestaurants();
+      fetchRiders();
       fetchStats();
     }
   }, [profile, loading]);
@@ -74,6 +77,18 @@ export default function AdminDashboard() {
       setRestaurants(data);
     }
     setLoading(false);
+  };
+
+  const fetchRiders = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'RIDER')
+      .order('created_at', { ascending: false });
+
+    if (data) {
+      setRiders(data);
+    }
   };
 
   const fetchStats = async () => {
@@ -99,6 +114,7 @@ export default function AdminDashboard() {
     setRefreshing(true);
     try {
       await fetchRestaurants();
+      await fetchRiders();
       await fetchStats();
       toast({
         title: 'Refreshed',
@@ -108,6 +124,69 @@ export default function AdminDashboard() {
       console.error('Refresh error:', error);
     } finally {
       setRefreshing(false);
+    }
+  };
+
+  const approveRider = async (riderId: string, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_verified: true })
+      .eq('id', riderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name} has been approved as a rider`,
+      });
+      fetchRiders();
+    }
+  };
+
+  const rejectRider = async (riderId: string, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'CUSTOMER', is_verified: false })
+      .eq('id', riderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name}'s rider application has been rejected`,
+      });
+      fetchRiders();
+    }
+  };
+
+  const toggleRiderStatus = async (riderId: string, currentStatus: boolean, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_verified: !currentStatus })
+      .eq('id', riderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name} has been ${!currentStatus ? 'activated' : 'deactivated'}`,
+      });
+      fetchRiders();
     }
   };
 
@@ -490,12 +569,30 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-white">Restaurants</CardTitle>
-            <CardDescription className="text-slate-400">Manage all onboarded restaurants</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="flex gap-4 mb-6">
+          <Button
+            onClick={() => setActiveTab('restaurants')}
+            className={activeTab === 'restaurants' ? 'bg-orange-500' : 'bg-slate-700'}
+          >
+            <Store className="mr-2 h-4 w-4" />
+            Restaurants
+          </Button>
+          <Button
+            onClick={() => setActiveTab('riders')}
+            className={activeTab === 'riders' ? 'bg-orange-500' : 'bg-slate-700'}
+          >
+            <Bike className="mr-2 h-4 w-4" />
+            Riders ({riders.filter(r => !r.is_verified).length} pending)
+          </Button>
+        </div>
+
+        {activeTab === 'restaurants' && (
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-white">Restaurants</CardTitle>
+              <CardDescription className="text-slate-400">Manage all onboarded restaurants</CardDescription>
+            </CardHeader>
+            <CardContent>
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700 hover:bg-slate-700/50">
@@ -571,6 +668,92 @@ export default function AdminDashboard() {
             </Table>
           </CardContent>
         </Card>
+        )}
+
+        {activeTab === 'riders' && (
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-white">Riders Management</CardTitle>
+              <CardDescription className="text-slate-400">Approve or manage rider applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-700 hover:bg-slate-700/50">
+                    <TableHead className="text-slate-300">Name</TableHead>
+                    <TableHead className="text-slate-300">Phone</TableHead>
+                    <TableHead className="text-slate-300">Vehicle Number</TableHead>
+                    <TableHead className="text-slate-300">Status</TableHead>
+                    <TableHead className="text-slate-300">Online</TableHead>
+                    <TableHead className="text-slate-300">Wallet Balance</TableHead>
+                    <TableHead className="text-slate-300">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {riders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-slate-400 py-8">
+                        No rider applications yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    riders.map((rider) => (
+                      <TableRow key={rider.id} className="border-slate-700 hover:bg-slate-700/30">
+                        <TableCell className="font-medium text-white">{rider.full_name || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-300">{rider.phone || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-300">{rider.vehicle_number || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={rider.is_verified ? 'default' : 'secondary'}>
+                            {rider.is_verified ? 'Approved' : 'Pending'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={rider.is_rider_online ? 'default' : 'outline'}>
+                            {rider.is_rider_online ? 'Online' : 'Offline'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-300">
+                          {formatPrice(rider.rider_wallet_balance || 0)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {!rider.is_verified ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => approveRider(rider.id, rider.full_name || 'Rider')}
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => rejectRider(rider.id, rider.full_name || 'Rider')}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </>
+                            ) : (
+                              <Switch
+                                checked={rider.is_verified}
+                                onCheckedChange={() => toggleRiderStatus(rider.id, rider.is_verified, rider.full_name || 'Rider')}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

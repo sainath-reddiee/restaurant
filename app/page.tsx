@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
-import { Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, User, Flame } from 'lucide-react';
+import { Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, User, Flame, Bike } from 'lucide-react';
 
 interface Restaurant {
   id: string;
@@ -88,15 +88,26 @@ export default function Home() {
             </div>
             <div className="flex items-center gap-2 sm:gap-3">
               {!user && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => router.push('/partner')}
-                  className="hidden md:flex text-xs sm:text-sm px-2 sm:px-3"
-                >
-                  <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                  Partner Login
-                </Button>
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push('/rider-signup')}
+                    className="hidden md:flex text-xs sm:text-sm px-2 sm:px-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  >
+                    <Bike className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Become a Rider
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => router.push('/partner')}
+                    className="hidden md:flex text-xs sm:text-sm px-2 sm:px-3"
+                  >
+                    <User className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                    Partner Login
+                  </Button>
+                </>
               )}
               {itemCount > 0 && (
                 <Button

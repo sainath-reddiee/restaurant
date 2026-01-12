@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase/client';
 import RiderLayout from '@/components/rider/RiderLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Power, MapPin, Navigation, DollarSign } from 'lucide-react';
+import { Power, MapPin, Navigation, DollarSign, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { formatPrice } from '@/lib/format';
 
@@ -30,6 +30,7 @@ export default function RiderDashboardPage() {
   const [loading, setLoading] = useState(true);
   const [availableOrders, setAvailableOrders] = useState<AvailableOrder[]>([]);
   const [accepting, setAccepting] = useState(false);
+  const [isVerified, setIsVerified] = useState(true);
 
   useEffect(() => {
     checkRiderStatus();
@@ -56,7 +57,7 @@ export default function RiderDashboardPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('is_rider_online, role')
+        .select('is_rider_online, role, is_verified')
         .eq('id', user.id)
         .single();
 
@@ -66,6 +67,13 @@ export default function RiderDashboardPage() {
         return;
       }
 
+      if (!profile.is_verified) {
+        setIsVerified(false);
+        setLoading(false);
+        return;
+      }
+
+      setIsVerified(true);
       setIsOnline(profile.is_rider_online || false);
     } catch (error) {
       console.error('Error checking rider status:', error);
@@ -170,6 +178,28 @@ export default function RiderDashboardPage() {
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
       </div>
+    );
+  }
+
+  if (!isVerified) {
+    return (
+      <RiderLayout>
+        <div className="flex items-center justify-center h-full px-4">
+          <div className="text-center max-w-md">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-amber-100 rounded-full mb-4">
+              <Shield className="w-10 h-10 text-amber-600" />
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Under Review</h2>
+            <p className="text-gray-600 mb-4">
+              Your rider application is currently being reviewed by our admin team.
+              You will receive a notification once your account is approved.
+            </p>
+            <p className="text-sm text-gray-500">
+              This usually takes 24-48 hours. Thank you for your patience!
+            </p>
+          </div>
+        </div>
+      </RiderLayout>
     );
   }
 
