@@ -162,7 +162,9 @@ export default function CheckoutPage() {
       deliveryFee,
       discount,
       walletBalance,
-      useWallet
+      useWallet,
+      undefined,
+      restaurant?.gst_enabled ?? true
     );
 
     return gstBreakdown;

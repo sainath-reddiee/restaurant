@@ -32,6 +32,7 @@ export interface Restaurant {
   gst_number: string | null;
   is_gst_registered: boolean;
   food_gst_rate: number;
+  gst_enabled: boolean;
 }
 
 export interface MenuItem {

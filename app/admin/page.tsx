@@ -41,6 +41,7 @@ export default function AdminDashboard() {
     free_delivery_threshold: '',
     slug: '',
     is_active: true,
+    gst_enabled: false,
   });
 
   // FIX: Proper authentication check with redirect to login or homepage
@@ -122,6 +123,7 @@ export default function AdminDashboard() {
       free_delivery_threshold: '',
       slug: '',
       is_active: true,
+      gst_enabled: false,
     });
     setDialogOpen(true);
   };
@@ -138,6 +140,7 @@ export default function AdminDashboard() {
       free_delivery_threshold: restaurant.free_delivery_threshold?.toString() || '',
       slug: restaurant.slug,
       is_active: restaurant.is_active,
+      gst_enabled: restaurant.gst_enabled || false,
     });
     setDialogOpen(true);
   };
@@ -154,6 +157,7 @@ export default function AdminDashboard() {
       free_delivery_threshold: formData.free_delivery_threshold ? parseInt(formData.free_delivery_threshold) : null,
       slug: formData.slug,
       is_active: formData.is_active,
+      gst_enabled: formData.gst_enabled,
     };
 
     let error;
@@ -198,6 +202,7 @@ export default function AdminDashboard() {
         free_delivery_threshold: '',
         slug: '',
         is_active: true,
+        gst_enabled: false,
       });
       fetchRestaurants();
       fetchStats();
@@ -415,7 +420,26 @@ export default function AdminDashboard() {
                   />
                   <p className="text-xs text-muted-foreground">Minimum order for free delivery</p>
                 </div>
-                <Button type="submit" className="w-full">Create Restaurant</Button>
+
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between space-x-4">
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="gst_enabled" className="text-base font-medium">
+                        Enable GST Calculations
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Only enable for restaurants with turnover above GST threshold (₹20L goods / ₹40L services)
+                      </p>
+                    </div>
+                    <Switch
+                      id="gst_enabled"
+                      checked={formData.gst_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, gst_enabled: checked })}
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full">{editMode ? 'Update Restaurant' : 'Create Restaurant'}</Button>
               </form>
             </DialogContent>
           </Dialog>

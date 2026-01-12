@@ -48,7 +48,8 @@ export function calculateGST(
   discountAmount: number = 0,
   walletBalance: number = 0,
   useWallet: boolean = false,
-  config: GSTConfig = DEFAULT_GST_CONFIG
+  config: GSTConfig = DEFAULT_GST_CONFIG,
+  gstEnabled: boolean = true
 ): GSTBreakdown {
 
   let subtotalBeforeGST: number;
@@ -56,7 +57,12 @@ export function calculateGST(
   let foodGSTAmount: number;
   let deliveryGSTAmount: number;
 
-  if (config.isGSTInclusive) {
+  if (!gstEnabled) {
+    subtotalBeforeGST = cartTotal;
+    deliveryFeeBeforeGST = deliveryFee;
+    foodGSTAmount = 0;
+    deliveryGSTAmount = 0;
+  } else if (config.isGSTInclusive) {
     subtotalBeforeGST = cartTotal / (1 + config.foodGSTRate / 100);
     foodGSTAmount = cartTotal - subtotalBeforeGST;
 
