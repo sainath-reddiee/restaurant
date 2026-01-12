@@ -1,3 +1,4 @@
+// Updated: 2026-01-12 08:42 - Fixed UUID extraction logic
 import { NextRequest, NextResponse } from 'next/server';
 import { checkPhonePePaymentStatus } from '@/lib/phonepe';
 import { createClient } from '@supabase/supabase-js';
@@ -72,7 +73,9 @@ export async function GET(request: NextRequest) {
         const parts = txnId.split('-');
         const walletTxnId = parts.slice(1, 6).join('-'); // Reconstruct UUID from parts
 
-        console.log('[Mock Verify] Extracted wallet transaction ID:', walletTxnId);
+        console.log('[Mock Verify V2 - CODE UPDATED] Full transaction ID:', txnId);
+        console.log('[Mock Verify V2 - CODE UPDATED] Parts after split:', parts);
+        console.log('[Mock Verify V2 - CODE UPDATED] Extracted wallet transaction ID:', walletTxnId);
 
         const { data: transaction, error } = await supabase
           .from('wallet_transactions')

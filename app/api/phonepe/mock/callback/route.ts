@@ -1,3 +1,4 @@
+// Updated: 2026-01-12 08:42 - Fixed UUID extraction logic
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -68,7 +69,9 @@ export async function POST(req: NextRequest) {
       const parts = merchantTransactionId.split('-');
       const walletTxnId = parts.slice(1, 6).join('-'); // Reconstruct UUID from parts
 
-      console.log('[Mock Callback] Extracted wallet transaction ID:', walletTxnId);
+      console.log('[Mock Callback V2 - CODE UPDATED] Full transaction ID:', merchantTransactionId);
+      console.log('[Mock Callback V2 - CODE UPDATED] Parts after split:', parts);
+      console.log('[Mock Callback V2 - CODE UPDATED] Extracted wallet transaction ID:', walletTxnId);
 
       // Look up the wallet transaction record
       const { data: walletTxn, error: walletTxnError } = await supabase
