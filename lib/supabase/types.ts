@@ -49,6 +49,8 @@ export interface MenuItem {
   mystery_type: MysteryType | null;
   is_available: boolean;
   is_veg: boolean;
+  loot_discount_percentage: number | null;
+  loot_description: string | null;
   created_at: string;
 }
 

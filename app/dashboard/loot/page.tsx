@@ -11,7 +11,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Zap } from 'lucide-react';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2, Zap, Gift, Percent, Sparkles } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 import Link from 'next/link';
@@ -92,6 +93,35 @@ export default function LootModeManagement() {
     }
   };
 
+  const updateLootSettings = async (itemId: string, discount: number, description: string) => {
+    const { error } = await supabase
+      .from('menu_items')
+      .update({
+        loot_discount_percentage: discount,
+        loot_description: description || null,
+      })
+      .eq('id', itemId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Loot settings updated',
+      });
+      fetchMenuItems(restaurant!.id);
+    }
+  };
+
+  const calculateDiscount = (basePrice: number, sellingPrice: number) => {
+    if (basePrice <= sellingPrice) return 0;
+    return Math.round(((basePrice - sellingPrice) / basePrice) * 100);
+  };
+
   const updateStock = async (itemId: string, stock: number) => {
     const { error } = await supabase
       .from('menu_items')
@@ -137,69 +167,123 @@ export default function LootModeManagement() {
         {lootItems.length > 0 && (
           <div className="mb-8">
             <h2 className="text-xl font-semibold mb-4">Active Loot Items</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {lootItems.map(item => (
-                <Card key={item.id} className="border-orange-500 border-2">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        <Zap className="h-5 w-5 text-orange-500" />
-                        {item.name}
-                      </CardTitle>
-                      <Badge variant="default" className="bg-orange-500">
-                        Loot Active
-                      </Badge>
-                    </div>
-                    <CardDescription>
-                      {formatPrice(item.selling_price)}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span>Stock Remaining</span>
-                        <span className="font-semibold">{item.stock_remaining} left</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {lootItems.map(item => {
+                const autoDiscount = calculateDiscount(item.base_price, item.selling_price);
+                const displayDiscount = item.loot_discount_percentage || autoDiscount;
+                return (
+                  <Card key={item.id} className="border-orange-500 border-2">
+                    <CardHeader>
+                      <div className="flex items-center justify-between">
+                        <CardTitle className="text-lg flex items-center gap-2">
+                          <Zap className="h-5 w-5 text-orange-500" />
+                          {item.name}
+                          {item.is_mystery && <Gift className="h-4 w-4 text-purple-500" />}
+                        </CardTitle>
+                        <Badge variant="default" className="bg-orange-500">
+                          Loot Active
+                        </Badge>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-orange-600 h-2 rounded-full"
-                          style={{ width: `${item.stock_remaining > 0 ? 100 : 0}%` }}
-                        />
+                      <CardDescription className="flex items-center gap-2">
+                        <span className="text-lg font-bold text-orange-600">{formatPrice(item.selling_price)}</span>
+                        {displayDiscount > 0 && (
+                          <>
+                            <span className="text-sm line-through text-gray-500">{formatPrice(item.base_price)}</span>
+                            <Badge variant="secondary" className="bg-green-100 text-green-700">
+                              {displayDiscount}% OFF
+                            </Badge>
+                          </>
+                        )}
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span>Stock Remaining</span>
+                          <span className="font-semibold">{item.stock_remaining} left</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div
+                            className="bg-orange-600 h-2 rounded-full transition-all"
+                            style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor={`stock-${item.id}`}>Update Stock</Label>
-                      <div className="flex gap-2">
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`stock-${item.id}`}>Update Stock</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id={`stock-${item.id}`}
+                            type="number"
+                            min="0"
+                            defaultValue={item.stock_remaining}
+                            onBlur={(e) => {
+                              const newStock = parseInt(e.target.value) || 0;
+                              if (newStock !== item.stock_remaining) {
+                                updateStock(item.id, newStock);
+                              }
+                            }}
+                          />
+                          <Button
+                            variant="outline"
+                            onClick={() => updateStock(item.id, 0)}
+                          >
+                            Clear
+                          </Button>
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`discount-${item.id}`} className="flex items-center gap-2">
+                          <Percent className="h-4 w-4" />
+                          Custom Discount % (0 = Auto: {autoDiscount}%)
+                        </Label>
                         <Input
-                          id={`stock-${item.id}`}
+                          id={`discount-${item.id}`}
                           type="number"
                           min="0"
-                          defaultValue={item.stock_remaining}
+                          max="100"
+                          defaultValue={item.loot_discount_percentage || 0}
                           onBlur={(e) => {
-                            const newStock = parseInt(e.target.value) || 0;
-                            if (newStock !== item.stock_remaining) {
-                              updateStock(item.id, newStock);
+                            const discount = parseInt(e.target.value) || 0;
+                            if (discount !== item.loot_discount_percentage) {
+                              updateLootSettings(item.id, discount, item.loot_description || '');
                             }
                           }}
+                          placeholder="e.g., 50"
                         />
-                        <Button
-                          variant="outline"
-                          onClick={() => updateStock(item.id, 0)}
-                        >
-                          Clear
-                        </Button>
                       </div>
-                    </div>
-                    <Button
-                      variant="destructive"
-                      className="w-full"
-                      onClick={() => toggleLootMode(item.id, item.is_clearance, item.stock_remaining)}
-                    >
-                      Disable Loot Mode
-                    </Button>
-                  </CardContent>
-                </Card>
-              ))}
+
+                      <div className="space-y-2">
+                        <Label htmlFor={`desc-${item.id}`} className="flex items-center gap-2">
+                          <Sparkles className="h-4 w-4" />
+                          Promo Description (Optional)
+                        </Label>
+                        <Textarea
+                          id={`desc-${item.id}`}
+                          defaultValue={item.loot_description || ''}
+                          onBlur={(e) => {
+                            if (e.target.value !== item.loot_description) {
+                              updateLootSettings(item.id, item.loot_discount_percentage || 0, e.target.value);
+                            }
+                          }}
+                          placeholder="e.g., Limited time mystery box! Could be veg or non-veg surprise"
+                          rows={2}
+                        />
+                      </div>
+
+                      <Button
+                        variant="destructive"
+                        className="w-full"
+                        onClick={() => toggleLootMode(item.id, item.is_clearance, item.stock_remaining)}
+                      >
+                        Disable Loot Mode
+                      </Button>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}

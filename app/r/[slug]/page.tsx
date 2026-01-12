@@ -255,73 +255,152 @@ export default function RestaurantMenuPage() {
         {lootItems.length > 0 && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-4">
-              <Zap className="h-6 w-6 text-orange-600" />
-              <h2 className="text-2xl font-bold">Late Night Loot</h2>
-              <Badge className="bg-orange-600">Limited Stock!</Badge>
+              <Zap className="h-6 w-6 text-orange-600 animate-pulse" />
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
+                Late Night Loot
+              </h2>
+              <Badge className="bg-orange-600 animate-pulse">Limited Stock!</Badge>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {lootItems.map(item => (
-                <Card key={item.id} className="border-2 border-orange-500">
-                  <CardHeader>
-                    {item.image_url && (
-                      <img
-                        src={item.image_url}
-                        alt={item.name}
-                        className="w-full h-40 object-cover rounded-md mb-2"
-                      />
+              {lootItems.map(item => {
+                const autoDiscount = item.base_price > item.selling_price
+                  ? Math.round(((item.base_price - item.selling_price) / item.base_price) * 100)
+                  : 0;
+                const displayDiscount = item.loot_discount_percentage || autoDiscount;
+                const isMysteryBox = item.is_mystery;
+
+                return (
+                  <Card
+                    key={item.id}
+                    className={`border-2 overflow-hidden relative ${
+                      isMysteryBox
+                        ? 'border-purple-500 bg-gradient-to-br from-purple-50 to-pink-50'
+                        : 'border-orange-500 bg-gradient-to-br from-orange-50 to-red-50'
+                    }`}
+                  >
+                    {isMysteryBox && (
+                      <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs py-1 px-3 text-center font-semibold animate-pulse">
+                        MYSTERY BOX - Surprise Inside!
+                      </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg flex items-center gap-2">
-                        {item.is_mystery && <Gift className="h-5 w-5 text-orange-600" />}
-                        {item.name}
-                      </CardTitle>
-                      <Badge className="bg-orange-600">{formatPrice(item.selling_price)}</Badge>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div>
-                      <div className="flex justify-between text-sm mb-2">
-                        <span className="font-medium">Only {item.stock_remaining} left!</span>
+                    <CardHeader className={isMysteryBox ? 'pt-8' : ''}>
+                      <div className="relative">
+                        {item.image_url && (
+                          <div className="relative overflow-hidden rounded-md mb-2">
+                            <img
+                              src={item.image_url}
+                              alt={item.name}
+                              className={`w-full h-40 object-cover ${isMysteryBox ? 'blur-sm brightness-75' : ''}`}
+                            />
+                            {isMysteryBox && (
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <Gift className="h-16 w-16 text-white animate-bounce" />
+                              </div>
+                            )}
+                          </div>
+                        )}
+                        <div className="flex items-start justify-between gap-2">
+                          <CardTitle className="text-lg flex items-center gap-2 flex-1">
+                            {isMysteryBox ? (
+                              <Gift className={`h-5 w-5 ${isMysteryBox ? 'text-purple-600' : 'text-orange-600'}`} />
+                            ) : (
+                              <Zap className="h-5 w-5 text-orange-600" />
+                            )}
+                            <span className={isMysteryBox ? 'text-purple-900' : ''}>{item.name}</span>
+                          </CardTitle>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={`${isMysteryBox ? 'bg-purple-600' : 'bg-orange-600'} text-lg px-3`}>
+                              {formatPrice(item.selling_price)}
+                            </Badge>
+                            {displayDiscount > 0 && (
+                              <div className="flex items-center gap-1">
+                                <span className="text-xs line-through text-gray-500">{formatPrice(item.base_price)}</span>
+                                <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                                  {displayDiscount}% OFF
+                                </Badge>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-orange-600 h-2 rounded-full"
-                          style={{ width: `${(item.stock_remaining / (item.stock_remaining + 10)) * 100}%` }}
-                        />
+                      {item.loot_description && (
+                        <CardDescription className={`text-sm mt-2 ${isMysteryBox ? 'text-purple-700' : 'text-gray-700'}`}>
+                          {item.loot_description}
+                        </CardDescription>
+                      )}
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <div>
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="font-medium flex items-center gap-1">
+                            <Zap className="h-3 w-3" />
+                            Only {item.stock_remaining} left!
+                          </span>
+                          {item.stock_remaining <= 5 && (
+                            <Badge variant="destructive" className="text-xs animate-pulse">
+                              Selling Fast!
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                          <div
+                            className={`h-2.5 rounded-full transition-all ${
+                              isMysteryBox
+                                ? 'bg-gradient-to-r from-purple-500 to-pink-500'
+                                : 'bg-gradient-to-r from-orange-500 to-red-500'
+                            }`}
+                            style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                    {getCartQuantity(item.id) > 0 ? (
-                      <div className="flex items-center justify-between">
+                      {getCartQuantity(item.id) > 0 ? (
+                        <div className="flex items-center justify-between bg-white rounded-lg p-2 border-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)}
+                            className="border-2"
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="font-bold text-lg">{getCartQuantity(item.id)}</span>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleAddToCart(item)}
+                            disabled={item.stock_remaining <= 0}
+                            className="border-2"
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      ) : (
                         <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => updateQuantity(item.id, getCartQuantity(item.id) - 1)}
-                        >
-                          <Minus className="h-4 w-4" />
-                        </Button>
-                        <span className="font-semibold">{getCartQuantity(item.id)}</span>
-                        <Button
-                          size="sm"
-                          variant="outline"
+                          className={`w-full text-white font-semibold shadow-lg hover:shadow-xl transition-all ${
+                            isMysteryBox
+                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700'
+                              : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700'
+                          }`}
                           onClick={() => handleAddToCart(item)}
                           disabled={item.stock_remaining <= 0}
                         >
-                          <Plus className="h-4 w-4" />
+                          {isMysteryBox ? (
+                            <>
+                              <Gift className="mr-2 h-4 w-4" />
+                              {item.stock_remaining > 0 ? 'Grab Mystery Box!' : 'Sold Out'}
+                            </>
+                          ) : (
+                            <>
+                              <Zap className="mr-2 h-4 w-4" />
+                              {item.stock_remaining > 0 ? 'Grab Now!' : 'Sold Out'}
+                            </>
+                          )}
                         </Button>
-                      </div>
-                    ) : (
-                      <Button
-                        className="w-full bg-orange-600 hover:bg-orange-700"
-                        onClick={() => handleAddToCart(item)}
-                        disabled={item.stock_remaining <= 0}
-                      >
-                        <Zap className="mr-2 h-4 w-4" />
-                        {item.stock_remaining > 0 ? 'Grab Now!' : 'Sold Out'}
-                      </Button>
-                    )}
-                  </CardContent>
-                </Card>
-              ))}
+                      )}
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </div>
         )}

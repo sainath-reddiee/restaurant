@@ -9,7 +9,8 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/lib/supabase/client';
-import { Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, User, Flame, Bike } from 'lucide-react';
+import { Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, User, Flame, Bike, Zap, Gift, Sparkles } from 'lucide-react';
+import { formatPrice } from '@/lib/format';
 
 interface Restaurant {
   id: string;
@@ -21,12 +22,30 @@ interface Restaurant {
   is_active: boolean;
 }
 
+interface LootItem {
+  id: string;
+  name: string;
+  selling_price: number;
+  base_price: number;
+  stock_remaining: number;
+  is_mystery: boolean;
+  loot_discount_percentage: number | null;
+  loot_description: string | null;
+  image_url: string | null;
+  restaurant_id: string;
+  restaurants: {
+    name: string;
+    slug: string;
+  };
+}
+
 export default function Home() {
   const { user, profile, loading: authLoading } = useAuth();
   const { itemCount } = useCart();
   const router = useRouter();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>([]);
+  const [lootItems, setLootItems] = useState<LootItem[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -44,21 +63,40 @@ export default function Home() {
   }, [user, profile, authLoading, router]);
 
   useEffect(() => {
-    const fetchRestaurants = async () => {
-      const { data, error } = await supabase
-        .from('restaurants')
-        .select('*')
-        .eq('is_active', true)
-        .order('name');
+    const fetchData = async () => {
+      const [restaurantsResult, lootItemsResult] = await Promise.all([
+        supabase
+          .from('restaurants')
+          .select('*')
+          .eq('is_active', true)
+          .order('name'),
+        supabase
+          .from('menu_items')
+          .select(`
+            *,
+            restaurants!inner(name, slug, is_active)
+          `)
+          .eq('is_clearance', true)
+          .eq('is_available', true)
+          .eq('restaurants.is_active', true)
+          .gt('stock_remaining', 0)
+          .order('stock_remaining', { ascending: true })
+          .limit(6)
+      ]);
 
-      if (data) {
-        setRestaurants(data);
-        setFilteredRestaurants(data);
+      if (restaurantsResult.data) {
+        setRestaurants(restaurantsResult.data);
+        setFilteredRestaurants(restaurantsResult.data);
       }
+
+      if (lootItemsResult.data) {
+        setLootItems(lootItemsResult.data as any);
+      }
+
       setLoading(false);
     };
 
-    fetchRestaurants();
+    fetchData();
   }, []);
 
   useEffect(() => {
@@ -148,6 +186,101 @@ export default function Home() {
             />
           </div>
         </div>
+
+        {lootItems.length > 0 && (
+          <div className="mb-8 animate-in fade-in slide-in-from-bottom-4 delay-400 duration-700">
+            <div className="bg-gradient-to-r from-orange-600 to-red-600 rounded-2xl p-6 sm:p-8 shadow-2xl">
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-3">
+                  <Zap className="h-7 w-7 text-white animate-pulse" />
+                  <h2 className="text-2xl sm:text-3xl font-bold text-white">Live Loot Mode</h2>
+                  <Badge className="bg-white text-orange-600 font-bold animate-pulse">LIVE NOW</Badge>
+                </div>
+              </div>
+              <p className="text-white/90 mb-6 text-sm sm:text-base">
+                Flash deals with limited stock - grab them before they're gone!
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {lootItems.map(item => {
+                  const autoDiscount = item.base_price > item.selling_price
+                    ? Math.round(((item.base_price - item.selling_price) / item.base_price) * 100)
+                    : 0;
+                  const displayDiscount = item.loot_discount_percentage || autoDiscount;
+                  const isMysteryBox = item.is_mystery;
+
+                  return (
+                    <Card
+                      key={item.id}
+                      className={`overflow-hidden cursor-pointer hover:shadow-2xl transition-all duration-300 hover:scale-105 ${
+                        isMysteryBox
+                          ? 'border-2 border-purple-400 bg-gradient-to-br from-purple-50 to-pink-50'
+                          : 'border-2 border-white/50 bg-white'
+                      }`}
+                      onClick={() => router.push(`/r/${item.restaurants.slug}`)}
+                    >
+                      {isMysteryBox && (
+                        <div className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs py-1 px-2 text-center font-semibold">
+                          MYSTERY BOX
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2 mb-1">
+                              {isMysteryBox ? (
+                                <Gift className="h-4 w-4 text-purple-600" />
+                              ) : (
+                                <Zap className="h-4 w-4 text-orange-600" />
+                              )}
+                              <h3 className="font-bold text-sm line-clamp-1">{item.name}</h3>
+                            </div>
+                            <p className="text-xs text-gray-600 mb-1">{item.restaurants.name}</p>
+                            {item.loot_description && (
+                              <p className="text-xs text-gray-500 line-clamp-1 mb-2">{item.loot_description}</p>
+                            )}
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={`${isMysteryBox ? 'bg-purple-600' : 'bg-orange-600'} text-sm`}>
+                              {formatPrice(item.selling_price)}
+                            </Badge>
+                            {displayDiscount > 0 && (
+                              <Badge variant="secondary" className="bg-green-100 text-green-700 text-xs">
+                                {displayDiscount}% OFF
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-gray-600 flex items-center gap-1">
+                              <Sparkles className="h-3 w-3" />
+                              {item.stock_remaining} left
+                            </span>
+                            {item.stock_remaining <= 5 && (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0 animate-pulse">
+                                Almost Gone!
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div
+                              className={`h-1.5 rounded-full transition-all ${
+                                isMysteryBox
+                                  ? 'bg-gradient-to-r from-purple-500 to-pink-500'
+                                  : 'bg-gradient-to-r from-orange-500 to-red-500'
+                              }`}
+                              style={{ width: `${Math.min((item.stock_remaining / 50) * 100, 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="flex justify-center py-12">
