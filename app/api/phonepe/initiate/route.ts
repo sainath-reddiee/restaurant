@@ -59,7 +59,31 @@ export async function POST(request: NextRequest) {
       ? `${baseUrl}/phonepe/payment-status?type=ORDER&txnId=${transactionId}`
       : `${baseUrl}/phonepe/payment-status?type=RECHARGE&txnId=${transactionId}`;
 
-    // Initiate PhonePe payment
+    // Check if mock mode is enabled
+    const isMockMode = process.env.PHONEPE_MOCK_MODE === 'true';
+
+    if (isMockMode) {
+      console.log('[PhonePe] Using MOCK mode for testing');
+
+      // Use mock payment gateway
+      const mockPaymentUrl = `/phonepe/mock-payment?` + new URLSearchParams({
+        merchantTransactionId: transactionId,
+        amount: amount.toString(),
+        redirectUrl: redirectUrl,
+        callbackUrl: callbackUrl,
+        merchantUserId: mobileNumber,
+        mobileNumber: mobileNumber
+      }).toString();
+
+      return NextResponse.json({
+        success: true,
+        redirectUrl: mockPaymentUrl,
+        transactionId,
+      });
+    }
+
+    // Initiate real PhonePe payment
+    console.log('[PhonePe] Using REAL PhonePe API');
     const result = await initiatePhonePePayment(
       transactionId,
       amount,
