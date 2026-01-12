@@ -2,6 +2,8 @@ export type UserRole = 'SUPER_ADMIN' | 'RESTAURANT' | 'CUSTOMER';
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'COOKING' | 'READY' | 'DELIVERED';
 export type PaymentMethod = 'PREPAID_UPI' | 'COD_CASH' | 'COD_UPI_SCAN';
 export type MysteryType = 'VEG' | 'NON_VEG' | 'ANY';
+export type WalletTransactionType = 'FEE_DEDUCTION' | 'WALLET_RECHARGE';
+export type WalletTransactionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface Profile {
   id: string;
@@ -25,6 +27,8 @@ export interface Restaurant {
   image_url: string | null;
   rating_avg: number;
   rating_count: number;
+  credit_balance: number;
+  min_balance_limit: number;
 }
 
 export interface MenuItem {
@@ -91,6 +95,19 @@ export interface Review {
   created_at: string;
 }
 
+export interface WalletTransaction {
+  id: string;
+  restaurant_id: string;
+  amount: number;
+  type: WalletTransactionType;
+  status: WalletTransactionStatus;
+  proof_image_url: string | null;
+  notes: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -118,6 +135,11 @@ export interface Database {
         Row: Order;
         Insert: Omit<Order, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Order, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      wallet_transactions: {
+        Row: WalletTransaction;
+        Insert: Omit<WalletTransaction, 'id' | 'created_at'>;
+        Update: Partial<Omit<WalletTransaction, 'id' | 'created_at'>>;
       };
     };
   };

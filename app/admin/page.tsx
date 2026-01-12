@@ -14,7 +14,8 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield } from 'lucide-react';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 
@@ -220,6 +221,12 @@ export default function AdminDashboard() {
               </div>
             </div>
             <div className="flex items-center gap-4">
+              <Link href="/admin/finance">
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Finance
+                </Button>
+              </Link>
               <div className="text-right">
                 <p className="text-white font-semibold">{profile?.full_name || 'Admin'}</p>
                 <p className="text-amber-100 text-sm">{profile?.phone}</p>

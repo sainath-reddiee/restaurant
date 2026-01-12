@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat } from 'lucide-react';
+import { Loader2, DollarSign, Package, Clock, CheckCircle, ChefHat, Wallet, AlertTriangle } from 'lucide-react';
 import { formatPrice, generateWhatsAppMessage, generateWhatsAppLink } from '@/lib/format';
 import { useToast } from '@/hooks/use-toast';
 import Link from 'next/link';
@@ -226,6 +226,12 @@ export default function RestaurantDashboard() {
             </div>
           </div>
           <div className="flex gap-2">
+            <Link href="/partner/wallet">
+              <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
+                <Wallet className="h-4 w-4 mr-2" />
+                Wallet
+              </Button>
+            </Link>
             <Link href="/dashboard/menu">
               <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">Menu</Button>
             </Link>
@@ -241,7 +247,68 @@ export default function RestaurantDashboard() {
       </div>
 
       <div className="container mx-auto p-6 max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {restaurant.credit_balance < restaurant.min_balance_limit && (
+          <div className="mb-6 bg-red-50 border-2 border-red-500 rounded-lg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-red-900">Wallet Balance Critical</h3>
+              <p className="text-sm text-red-700 mt-1">
+                Your wallet balance is {formatPrice(restaurant.credit_balance)}. Restaurant is suspended and cannot accept new orders.
+                Please recharge immediately.
+              </p>
+            </div>
+            <Link href="/partner/wallet">
+              <Button className="bg-red-600 hover:bg-red-700">
+                Recharge Now
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        {restaurant.credit_balance >= restaurant.min_balance_limit && restaurant.credit_balance < 0 && (
+          <div className="mb-6 bg-yellow-50 border-2 border-yellow-500 rounded-lg p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="font-semibold text-yellow-900">Low Wallet Balance</h3>
+              <p className="text-sm text-yellow-700 mt-1">
+                Your wallet balance is {formatPrice(restaurant.credit_balance)}. Consider recharging soon to avoid service interruption.
+              </p>
+            </div>
+            <Link href="/partner/wallet">
+              <Button className="bg-yellow-600 hover:bg-yellow-700">
+                View Wallet
+              </Button>
+            </Link>
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <Card className={`border-0 text-white shadow-lg hover:shadow-xl transition-shadow ${
+            restaurant.credit_balance >= 0
+              ? 'bg-gradient-to-br from-green-500 to-emerald-600'
+              : restaurant.credit_balance >= restaurant.min_balance_limit
+              ? 'bg-gradient-to-br from-yellow-500 to-orange-600'
+              : 'bg-gradient-to-br from-red-500 to-rose-600'
+          }`}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Wallet Balance</CardTitle>
+              <Wallet className="h-5 w-5 text-white/80" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{formatPrice(restaurant.credit_balance)}</div>
+              <p className="text-xs text-white/80">Tech fee: ₹{restaurant.tech_fee}/order</p>
+            </CardContent>
+          </Card>
+          <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium text-white">Total Sales</CardTitle>
+              <DollarSign className="h-5 w-5 text-emerald-100" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-3xl font-bold">{formatPrice(totalSales)}</div>
+              <p className="text-xs text-emerald-100">Revenue before delivery fees</p>
+            </CardContent>
+          </Card>
           <Card className="bg-gradient-to-br from-emerald-500 to-green-600 border-0 text-white shadow-lg hover:shadow-xl transition-shadow">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium text-white">Total Sales</CardTitle>
