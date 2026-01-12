@@ -96,6 +96,9 @@ export default function LoginPage() {
           case 'RESTAURANT_OWNER':
             redirectPath = '/partner';
             break;
+          case 'RIDER':
+            redirectPath = '/rider/dashboard';
+            break;
           case 'CUSTOMER':
             redirectPath = '/';
             break;

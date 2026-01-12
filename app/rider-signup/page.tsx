@@ -38,7 +38,15 @@ export default function RiderSignupPage() {
         password: formData.password,
       });
 
-      if (signUpError) throw signUpError;
+      if (signUpError) {
+        if (signUpError.message.includes('User already registered') || signUpError.message.includes('already exists')) {
+          toast.error('This email is already registered. Please login instead.');
+          setTimeout(() => router.push('/login'), 2000);
+          setLoading(false);
+          return;
+        }
+        throw signUpError;
+      }
 
       if (!authData.user) {
         throw new Error('Failed to create account');
