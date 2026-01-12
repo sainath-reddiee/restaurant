@@ -20,9 +20,10 @@ export async function GET(request: NextRequest) {
     if (isMockMode) {
       console.log('[PhonePe Verify] Using MOCK mode verification');
 
+      // Use service role to bypass RLS since this is a server-side verification
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
 
       if (txnId.startsWith('order_')) {
