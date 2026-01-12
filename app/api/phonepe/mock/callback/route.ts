@@ -1,19 +1,32 @@
-// Updated: 2026-01-12 09:05 - Fixed Supabase client initialization
+// Updated: 2026-01-12 14:45 - Improved error handling and Supabase connection
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-// Create Supabase client OUTSIDE handler for proper initialization
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  auth: {
-    autoRefreshToken: false,
-    persistSession: false
+function getSupabaseClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('Missing Supabase credentials');
   }
-});
+
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    },
+    global: {
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }
+  });
+}
 
 export async function POST(req: NextRequest) {
   console.log('[Mock Callback V4] Starting callback processing...');
+  let supabase;
+
   try {
     console.log('[Mock Callback V4] Step 1: Parsing request body...');
     const body = await req.json();
@@ -26,7 +39,9 @@ export async function POST(req: NextRequest) {
       timestamp: new Date().toISOString()
     });
 
-    console.log('[Mock Callback V4] Step 3: Supabase client ready');
+    console.log('[Mock Callback V4] Step 3: Initializing Supabase client...');
+    supabase = getSupabaseClient();
+    console.log('[Mock Callback V4] Step 4: Supabase client ready');
 
     // Update order status based on payment result
     if (merchantTransactionId.startsWith('order_') || merchantTransactionId.startsWith('ORDER-')) {
@@ -42,11 +57,23 @@ export async function POST(req: NextRequest) {
         console.log('[Mock Callback V4] ORDER format - Extracted order ID:', orderId);
       }
 
-      const { data: order, error: fetchError } = await supabase
-        .from('orders')
-        .select('*')
-        .or(orderId ? `payment_transaction_id.eq.${merchantTransactionId},id.eq.${orderId}` : `payment_transaction_id.eq.${merchantTransactionId}`)
-        .maybeSingle();
+      console.log('[Mock Callback V4] Fetching order from database...');
+      let order;
+      let fetchError;
+
+      try {
+        const result = await supabase
+          .from('orders')
+          .select('*')
+          .or(orderId ? `payment_transaction_id.eq.${merchantTransactionId},id.eq.${orderId}` : `payment_transaction_id.eq.${merchantTransactionId}`)
+          .maybeSingle();
+
+        order = result.data;
+        fetchError = result.error;
+      } catch (err) {
+        console.error('[Mock Callback V4] Exception during fetch:', err);
+        fetchError = err;
+      }
 
       if (fetchError) {
         console.error('[Mock Callback V4] Error fetching order:', fetchError);
@@ -61,23 +88,33 @@ export async function POST(req: NextRequest) {
         }, { status: 404 });
       }
 
+      console.log('[Mock Callback V4] Order found:', order.id);
       const newStatus = status === 'success' ? 'CONFIRMED' : 'PENDING';
+      console.log('[Mock Callback V4] Updating order status to:', newStatus);
 
-      const { error: updateError } = await supabase
-        .from('orders')
-        .update({
-          status: newStatus,
-          payment_merchant_transaction_id: merchantTransactionId,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', order.id);
+      let updateError;
+      try {
+        const result = await supabase
+          .from('orders')
+          .update({
+            status: newStatus,
+            payment_merchant_transaction_id: merchantTransactionId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', order.id);
+
+        updateError = result.error;
+      } catch (err) {
+        console.error('[Mock Callback V4] Exception during update:', err);
+        updateError = err;
+      }
 
       if (updateError) {
         console.error('[Mock Callback V4] Error updating order:', updateError);
         throw updateError;
       }
 
-      console.log('[Mock Callback V4] Order updated:', order.id, 'Status:', newStatus);
+      console.log('[Mock Callback V4] ✓ Order updated successfully:', order.id, 'Status:', newStatus);
     }
     // Handle wallet recharge
     else if (merchantTransactionId.startsWith('RECHARGE-')) {
@@ -94,12 +131,22 @@ export async function POST(req: NextRequest) {
       console.log('[Mock Callback V4] Extracted wallet transaction ID:', walletTxnId);
 
       console.log('[Mock Callback V4] Step 6: Querying wallet transaction from database...');
-      // Look up the wallet transaction record
-      const { data: walletTxn, error: walletTxnError } = await supabase
-        .from('wallet_transactions')
-        .select('restaurant_id, amount, id')
-        .eq('id', walletTxnId)
-        .maybeSingle();
+      let walletTxn;
+      let walletTxnError;
+
+      try {
+        const result = await supabase
+          .from('wallet_transactions')
+          .select('restaurant_id, amount, id')
+          .eq('id', walletTxnId)
+          .maybeSingle();
+
+        walletTxn = result.data;
+        walletTxnError = result.error;
+      } catch (err) {
+        console.error('[Mock Callback V4] Exception during wallet txn fetch:', err);
+        walletTxnError = err;
+      }
 
       console.log('[Mock Callback V4] Step 7: Database query result:', {
         found: !!walletTxn,
@@ -113,19 +160,29 @@ export async function POST(req: NextRequest) {
         throw walletTxnError || new Error('Wallet transaction not found');
       }
 
-      console.log('[Mock Callback V4] Step 7: Calling database function to process recharge...');
+      console.log('[Mock Callback V4] Step 8: Calling database function to process recharge...');
       console.log('[Mock Callback V4] Wallet Transaction ID:', walletTxnId);
       console.log('[Mock Callback V4] Payment Transaction ID:', merchantTransactionId);
       console.log('[Mock Callback V4] Payment Status:', status);
 
-      // Use single database function to handle everything atomically
-      const { data: result, error: processError } = await supabase.rpc('process_wallet_recharge', {
-        wallet_txn_id: walletTxnId,
-        payment_txn_id: merchantTransactionId,
-        payment_status: status
-      });
+      let result;
+      let processError;
 
-      console.log('[Mock Callback V4] Step 8: Database function result:', {
+      try {
+        const rpcResult = await supabase.rpc('process_wallet_recharge', {
+          wallet_txn_id: walletTxnId,
+          payment_txn_id: merchantTransactionId,
+          payment_status: status
+        });
+
+        result = rpcResult.data;
+        processError = rpcResult.error;
+      } catch (err) {
+        console.error('[Mock Callback V4] Exception during RPC call:', err);
+        processError = err;
+      }
+
+      console.log('[Mock Callback V4] Step 9: Database function result:', {
         success: result?.success,
         message: result?.message,
         error: processError ? 'ERROR' : 'NO ERROR'
@@ -142,7 +199,7 @@ export async function POST(req: NextRequest) {
         throw new Error(result?.message || 'Failed to process wallet recharge');
       }
 
-      console.log('[Mock Callback V4] SUCCESS! Wallet recharge processed');
+      console.log('[Mock Callback V4] ✓ SUCCESS! Wallet recharge processed');
       console.log('[Mock Callback V4] Restaurant ID:', result.restaurant_id);
       console.log('[Mock Callback V4] Amount:', result.amount);
       console.log('[Mock Callback V4] New Status:', result.new_status);
