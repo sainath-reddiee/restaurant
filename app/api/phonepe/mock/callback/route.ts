@@ -22,7 +22,13 @@ export async function POST(req: NextRequest) {
 
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
     );
 
     console.log('[Mock Callback V3] Step 4: Supabase client created successfully');
@@ -107,32 +113,73 @@ export async function POST(req: NextRequest) {
       const restaurantId = walletTxn.restaurant_id;
       const rechargeAmount = walletTxn.amount;
 
+      console.log('[Mock Callback V3] Step 9: Restaurant ID:', restaurantId);
+      console.log('[Mock Callback V3] Step 9: Recharge amount:', rechargeAmount);
+
       if (status === 'success') {
+        console.log('[Mock Callback V3] Step 10: Fetching restaurant data...');
         const { data: restaurant, error: restaurantError } = await supabase
           .from('restaurants')
           .select('credit_balance')
           .eq('id', restaurantId)
           .maybeSingle();
 
+        console.log('[Mock Callback V3] Step 11: Restaurant fetch result:', {
+          found: !!restaurant,
+          error: restaurantError ? 'ERROR' : 'NO ERROR',
+          currentBalance: restaurant?.credit_balance
+        });
+
         if (restaurantError) {
-          console.error('[Mock Callback] Error fetching restaurant:', restaurantError);
+          console.error('[Mock Callback V3] ERROR: Failed to fetch restaurant:', restaurantError);
           throw restaurantError;
         }
 
-        const currentBalance = restaurant?.credit_balance || 0;
+        if (!restaurant) {
+          console.error('[Mock Callback V3] ERROR: Restaurant not found with ID:', restaurantId);
+          throw new Error(`Restaurant not found: ${restaurantId}`);
+        }
+
+        const currentBalance = restaurant.credit_balance || 0;
         const newBalance = currentBalance + rechargeAmount;
 
-        const { error: updateError } = await supabase
-          .from('restaurants')
-          .update({
-            credit_balance: newBalance
-          })
-          .eq('id', restaurantId);
+        console.log('[Mock Callback V3] Step 12: Updating restaurant balance via SQL...');
+        console.log('[Mock Callback V3] Current balance:', currentBalance);
+        console.log('[Mock Callback V3] New balance:', newBalance);
+
+        // Use raw SQL to bypass any potential ORM issues
+        const { error: updateError } = await supabase.rpc('increment_restaurant_balance', {
+          restaurant_id: restaurantId,
+          amount_to_add: rechargeAmount
+        });
+
+        console.log('[Mock Callback V3] Step 13: Update result:', {
+          error: updateError ? 'ERROR' : 'SUCCESS'
+        });
 
         if (updateError) {
-          console.error('[Mock Callback] Error updating restaurant wallet:', updateError);
-          throw updateError;
+          console.error('[Mock Callback V3] ERROR: Failed to update restaurant wallet via RPC');
+          console.error('[Mock Callback V3] Update error details:', JSON.stringify(updateError, null, 2));
+
+          // Fallback to direct update
+          console.log('[Mock Callback V3] Step 13b: Trying direct UPDATE as fallback...');
+          const { error: directUpdateError } = await supabase
+            .from('restaurants')
+            .update({
+              credit_balance: newBalance
+            })
+            .eq('id', restaurantId);
+
+          if (directUpdateError) {
+            console.error('[Mock Callback V3] ERROR: Direct update also failed');
+            console.error('[Mock Callback V3] Direct update error:', JSON.stringify(directUpdateError, null, 2));
+            throw directUpdateError;
+          }
+
+          console.log('[Mock Callback V3] Step 13c: Direct update succeeded');
         }
+
+        console.log('[Mock Callback V3] Step 14: Restaurant wallet updated successfully');
 
         // Update wallet transaction status to APPROVED
         const { error: txUpdateError } = await supabase
