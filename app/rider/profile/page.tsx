@@ -13,10 +13,44 @@ export default function RiderProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetchProfile();
+    checkAuthAndFetchProfile();
   }, []);
+
+  const checkAuthAndFetchProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please login to continue');
+        router.push('/login');
+        return;
+      }
+
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!profile || profile.role !== 'RIDER') {
+        toast.error('You are not registered as a rider');
+        router.push('/join-rider');
+        return;
+      }
+
+      setProfile(profile);
+      setAuthChecked(true);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+      router.push('/login');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -49,13 +83,11 @@ export default function RiderProfilePage() {
     }
   };
 
-  if (loading) {
+  if (!authChecked || loading) {
     return (
-      <RiderLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-        </div>
-      </RiderLayout>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
     );
   }
 

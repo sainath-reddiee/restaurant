@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import RiderLayout from '@/components/rider/RiderLayout';
 import { Button } from '@/components/ui/button';
@@ -29,13 +30,44 @@ interface ActiveOrder {
 }
 
 export default function RiderActivePage() {
+  const router = useRouter();
   const [activeOrders, setActiveOrders] = useState<ActiveOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetchActiveOrders();
+    checkAuthAndFetchOrders();
   }, []);
+
+  const checkAuthAndFetchOrders = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please login to continue');
+        router.push('/login');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile || profile.role !== 'RIDER') {
+        toast.error('You are not registered as a rider');
+        router.push('/join-rider');
+        return;
+      }
+
+      setAuthChecked(true);
+      fetchActiveOrders();
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      router.push('/login');
+    }
+  };
 
   const fetchActiveOrders = async () => {
     try {
@@ -83,13 +115,11 @@ export default function RiderActivePage() {
     }
   };
 
-  if (loading) {
+  if (!authChecked || loading) {
     return (
-      <RiderLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-        </div>
-      </RiderLayout>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
     );
   }
 

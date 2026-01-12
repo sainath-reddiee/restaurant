@@ -1,23 +1,56 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase/client';
 import RiderLayout from '@/components/rider/RiderLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Wallet, TrendingUp, Package } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
+import { toast } from 'sonner';
 
 export default function RiderEarningsPage() {
+  const router = useRouter();
   const [stats, setStats] = useState({
     totalEarnings: 0,
     completedDeliveries: 0,
     walletBalance: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false);
 
   useEffect(() => {
-    fetchEarnings();
+    checkAuthAndFetchEarnings();
   }, []);
+
+  const checkAuthAndFetchEarnings = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        toast.error('Please login to continue');
+        router.push('/login');
+        return;
+      }
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (!profile || profile.role !== 'RIDER') {
+        toast.error('You are not registered as a rider');
+        router.push('/join-rider');
+        return;
+      }
+
+      setAuthChecked(true);
+      fetchEarnings();
+    } catch (error) {
+      console.error('Error checking auth:', error);
+      router.push('/login');
+    }
+  };
 
   const fetchEarnings = async () => {
     try {
@@ -48,13 +81,11 @@ export default function RiderEarningsPage() {
     }
   };
 
-  if (loading) {
+  if (!authChecked || loading) {
     return (
-      <RiderLayout>
-        <div className="flex items-center justify-center h-full">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
-        </div>
-      </RiderLayout>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-500"></div>
+      </div>
     );
   }
 
