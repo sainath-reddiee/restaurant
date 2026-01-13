@@ -120,7 +120,7 @@ export default function Home() {
                 <ChefHat className="w-4 h-4 sm:w-6 sm:h-6 text-white" />
               </div>
               <div>
-                <h1 className="text-base sm:text-xl font-bold text-gray-900">Anantapur</h1>
+                <h1 className="text-base sm:text-xl font-bold text-gray-900">GO515</h1>
                 <p className="text-[10px] sm:text-xs text-gray-500 -mt-0.5">Local Food Delivery</p>
               </div>
             </div>
@@ -425,11 +425,11 @@ export default function Home() {
       </main>
 
       <section className="mt-8 sm:mt-12 bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg border border-gray-100 animate-in fade-in slide-in-from-bottom-4 delay-600">
-        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">About Anantapur OS</h2>
+        <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-4 sm:mb-6">About GO515</h2>
         <div className="grid md:grid-cols-2 gap-6 sm:gap-8 text-sm sm:text-base">
           <div>
             <p className="text-gray-700 leading-relaxed mb-4">
-              Anantapur is a hyperlocal food delivery platform designed specifically for tier-2 and tier-3 cities. We connect local restaurants with customers through a seamless digital storefront experience.
+              GO515 is a hyperlocal food delivery platform designed specifically for tier-2 and tier-3 cities. We connect local restaurants with customers through a seamless digital storefront experience.
             </p>
             <p className="text-gray-700 leading-relaxed">
               Our platform features innovative Late Night Loot Mode for flash sales, guest checkout for convenience, and powerful restaurant management tools.
@@ -482,7 +482,7 @@ export default function Home() {
           {!user && (
             <p className="mb-2">Restaurant Partner? <button onClick={() => router.push('/partner')} className="text-orange-600 hover:underline font-medium hover:text-orange-700 transition-colors duration-300">Login here</button></p>
           )}
-          <p className="text-[10px] sm:text-xs text-gray-500">© 2026 Anantapur. Digital Storefront & Logistics OS for Tier-2 Cities.</p>
+          <p className="text-[10px] sm:text-xs text-gray-500">© 2026 GO515. Digital Storefront & Logistics OS for Tier-2 Cities.</p>
         </div>
       </footer>
     </div>
