@@ -17,9 +17,7 @@ export function Footer() {
             <p className="text-sm text-gray-500 mb-4">
               Hyperlocal food delivery platform designed for Tier-2 cities.
             </p>
-            <p className="text-sm font-semibold text-gray-900">
-              Registered Business: <br/> GO515 TECHNOLOGIES
-            </p>
+            {/* REMOVED REGISTERED BUSINESS LINE HERE */}
           </div>
 
           {/* Quick Links */}
@@ -33,7 +31,7 @@ export function Footer() {
             </ul>
           </div>
 
-          {/* Legal Links (REQUIRED FOR PHONEPE) */}
+          {/* Legal Links */}
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Legal</h3>
             <ul className="space-y-2 text-sm text-gray-600">
@@ -48,7 +46,7 @@ export function Footer() {
           <div>
             <h3 className="font-semibold text-gray-900 mb-4">Contact Us</h3>
             <ul className="space-y-2 text-sm text-gray-600">
-              <li>PNR Kitchens Tadipatri, Andhra Pradesh</li>
+              <li>PNR Kitchenes Tadipatri, Andhra Pradesh</li>
               <li>Email: psainath123@gmail.com</li>
               <li>Phone: +91 9441414140</li>
             </ul>
