@@ -13,17 +13,17 @@ import { supabase } from '@/lib/supabase/client';
 import { 
   Loader2, Search, ShoppingCart, ChefHat, Clock, MapPin, 
   User, Flame, Bike, Zap, Gift, Sparkles, Utensils, Pizza, Sandwich,
-  Navigation, ChevronDown, Bell, CheckCircle2, ArrowRight, X
+  Navigation, ChevronDown, Bell, CheckCircle2, ArrowRight
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
-// --- LIVE TICKER (Simulates App Activity) ---
+// --- LIVE UPDATES CONFIG ---
 const LIVE_UPDATES = [
-  "🔥 Someone nearby just ordered Chicken Biryani",
-  "🍕 New order: 2x Large Peppy Paneer Pizzas",
-  "🎁 3 people are claiming Mystery Boxes right now",
-  "⚡ Flash Sale: Spicy Shawarma is 40% OFF",
-  "🛵 12 Riders are active in your area"
+  "Someone nearby just ordered Chicken Biryani 🍗",
+  "New order placed for 2x Large Pizzas 🍕",
+  "Raju's Kitchen is trending right now! 🔥",
+  "A customer just saved ₹150 on a Mystery Box 🎁",
+  "5 people are browsing Spicy Shawarma 🥙"
 ];
 
 interface Restaurant {
@@ -58,20 +58,21 @@ export default function Home() {
   const { itemCount } = useCart();
   const router = useRouter();
   
-  // Data State
+  // --- STATE MANAGEMENT ---
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
   const [filteredRestaurants, setFilteredRestaurants] = useState<Restaurant[]>([]);
   const [lootItems, setLootItems] = useState<LootItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Location & UI State
+  // Location UI State
   const [locationName, setLocationName] = useState<string>('Select Location');
   const [manualLocation, setManualLocation] = useState('');
   const [isLocating, setIsLocating] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
   const [currentUpdateIndex, setCurrentUpdateIndex] = useState(0);
 
+  // --- 1. AUTH REDIRECT ---
   useEffect(() => {
     if (!authLoading && user && profile) {
       if (profile.role === 'SUPER_ADMIN') router.push('/admin');
@@ -79,37 +80,47 @@ export default function Home() {
     }
   }, [user, profile, authLoading, router]);
 
+  // --- 2. DATA FETCHING & INITIALIZATION ---
   useEffect(() => {
     const fetchData = async () => {
-      const [restaurantsResult, lootItemsResult] = await Promise.all([
-        supabase.from('restaurants').select('*').eq('is_active', true).order('name'),
-        supabase.from('menu_items')
-          .select(`*, restaurants!inner(name, slug, is_active)`)
-          .eq('is_clearance', true)
-          .eq('is_available', true)
-          .eq('restaurants.is_active', true)
-          .gt('stock_remaining', 0)
-          .order('stock_remaining', { ascending: true })
-          .limit(6)
-      ]);
+      try {
+        const [restaurantsResult, lootItemsResult] = await Promise.all([
+          supabase.from('restaurants').select('*').eq('is_active', true).order('name'),
+          supabase.from('menu_items')
+            .select(`*, restaurants!inner(name, slug, is_active)`)
+            .eq('is_clearance', true)
+            .eq('is_available', true)
+            .eq('restaurants.is_active', true)
+            .gt('stock_remaining', 0)
+            .order('stock_remaining', { ascending: true })
+            .limit(6)
+        ]);
 
-      if (restaurantsResult.data) {
-        setRestaurants(restaurantsResult.data);
-        setFilteredRestaurants(restaurantsResult.data);
+        if (restaurantsResult.data) {
+          setRestaurants(restaurantsResult.data);
+          setFilteredRestaurants(restaurantsResult.data);
+        }
+        if (lootItemsResult.data) {
+          setLootItems(lootItemsResult.data as any);
+        }
+      } catch (error) {
+        console.error("Error loading data", error);
+      } finally {
+        setLoading(false);
       }
-      if (lootItemsResult.data) setLootItems(lootItemsResult.data as any);
-      setLoading(false);
     };
 
     fetchData();
     detectLocation(); // Auto-start GPS
 
+    // Ticker Loop
     const interval = setInterval(() => {
       setCurrentUpdateIndex((prev) => (prev + 1) % LIVE_UPDATES.length);
     }, 4000);
     return () => clearInterval(interval);
   }, []);
 
+  // --- 3. SEARCH FILTER ---
   useEffect(() => {
     if (searchQuery.trim()) {
       const filtered = restaurants.filter(r => r.name.toLowerCase().includes(searchQuery.toLowerCase()));
@@ -119,7 +130,7 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
-  // --- 🌍 REAL GPS LOGIC (Nominatim API) ---
+  // --- 4. REAL GPS LOGIC (Nominatim API) ---
   const detectLocation = () => {
     setIsLocating(true);
     
@@ -134,7 +145,7 @@ export default function Home() {
         try {
           const { latitude, longitude } = position.coords;
           
-          // Call OpenStreetMap API to get real address
+          // Reverse Geocoding via OpenStreetMap (Free)
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
@@ -144,29 +155,28 @@ export default function Home() {
           const data = await response.json();
           const address = data.address;
           
-          // Smart formatting: "Street, City"
+          // Construct Smart Address
           const area = address.suburb || address.neighbourhood || address.residential || address.road || '';
           const city = address.city || address.town || address.village || address.county || '';
           
-          // If we found specific data, use it. Otherwise fallback.
           const finalLocation = area ? `${area}, ${city}` : city;
           
           if (finalLocation && finalLocation.trim() !== ',') {
             setLocationName(finalLocation);
           } else {
-            setLocationName('Current Location (GPS)');
+            setLocationName('GPS Active (Unknown Area)');
           }
           
         } catch (error) {
           console.error('Error fetching address:', error);
-          setLocationName('GPS Active');
+          // Keep previous state or show error
         } finally {
           setIsLocating(false);
         }
       },
       (error) => {
         console.error('Location error:', error);
-        setIsLocating(false); // Fails silently, user sees "Select Location"
+        setIsLocating(false);
       },
       { 
         enableHighAccuracy: true, 
@@ -187,7 +197,7 @@ export default function Home() {
   const liveLootItems = lootItems.filter(item => !item.is_mystery);
 
   return (
-    <div className="min-h-screen bg-[#f2f4f7] pb-24 font-sans selection:bg-orange-200">
+    <div className="min-h-screen bg-[#f2f4f7] pb-24 font-sans">
       
       {/* 1. TICKER BAR */}
       <div className="bg-[#111] text-white text-[10px] sm:text-xs font-medium py-2 overflow-hidden relative z-50">
@@ -199,7 +209,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2. GLASS NAVIGATION */}
+      {/* 2. GLASS HEADER */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-white/20 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -227,18 +237,29 @@ export default function Home() {
               </div>
             </div>
             
-            {/* Cart & Auth */}
+            {/* Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
-              {!user && (
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  onClick={() => router.push('/partner')}
-                  className="hidden sm:flex rounded-full border-gray-200 hover:bg-gray-50 text-xs"
-                >
-                  Partner Login
-                </Button>
-              )}
+              {!user ? (
+                <>
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    onClick={() => router.push('/rider-signup')}
+                    className="hidden md:flex text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-full text-xs font-medium"
+                  >
+                    <Bike className="w-4 h-4 mr-2" />
+                    Ride
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    onClick={() => router.push('/partner')}
+                    className="hidden sm:flex rounded-full border-gray-200 hover:bg-gray-50 text-xs text-orange-700 border-orange-100"
+                  >
+                    Partner
+                  </Button>
+                </>
+              ) : null}
               
               {itemCount > 0 && (
                 <Button 
@@ -261,9 +282,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 3. MODERN HERO (Aurora Effect) */}
+      {/* 3. HERO SECTION (Aurora) */}
       <div className="relative bg-[#1a1a1a] text-white pt-10 pb-20 px-4 rounded-b-[2.5rem] shadow-2xl overflow-hidden mb-10">
-        {/* Animated Aurora Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
           <div className="absolute -top-[100px] -right-[100px] w-[500px] h-[500px] bg-purple-600/40 rounded-full blur-[120px] animate-pulse"></div>
           <div className="absolute -bottom-[100px] -left-[100px] w-[500px] h-[500px] bg-orange-600/30 rounded-full blur-[120px] animate-pulse delay-1000"></div>
@@ -280,7 +300,6 @@ export default function Home() {
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Delicious?</span>
           </h1>
           
-          {/* Advanced Search Bar */}
           <div className="relative max-w-lg mx-auto group mt-8">
             <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 via-purple-500 to-red-500 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
             <div className="relative flex items-center bg-white rounded-full p-2 shadow-2xl transform transition-transform group-hover:scale-[1.01]">
@@ -304,7 +323,7 @@ export default function Home() {
 
       <main className="container mx-auto px-4 max-w-7xl -mt-14 relative z-20 space-y-10">
         
-        {/* 4. "WHAT'S ON YOUR MIND?" (3D Icons) */}
+        {/* 4. CATEGORIES (3D Icons) */}
         <div className="bg-white/80 backdrop-blur-lg rounded-3xl p-6 shadow-xl shadow-gray-200/50 border border-white/50">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-5 ml-1">What's on your mind?</h3>
           <div className="flex gap-4 sm:gap-8 overflow-x-auto no-scrollbar pb-2 px-1">
@@ -326,7 +345,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 5. LIVE LOOT (Glassmorphism Cards) */}
+        {/* 5. LOOT & MYSTERY BOXES */}
         {(mysteryItems.length > 0 || liveLootItems.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             
@@ -403,7 +422,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. RESTAURANTS (Clean Cards) */}
+        {/* 6. RESTAURANTS LIST */}
         <div>
           <div className="flex items-center justify-between mb-6 px-1">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -442,7 +461,6 @@ export default function Home() {
                         <ChefHat className="w-12 h-12 text-gray-300" />
                       </div>
                     )}
-                    {/* Gradient Overlay */}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90"></div>
                     
                     <div className="absolute bottom-4 left-4 right-4 text-white">
@@ -478,7 +496,58 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 7. MANUAL LOCATION MODAL (Simple & Functional) */}
+      {/* 7. ABOUT SECTION (RESTORED) */}
+      <section className="container mx-auto px-4 mt-12 mb-10">
+        <div className="bg-[#1a1a1a] rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
+          <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
+            <div>
+              <div className="inline-block bg-orange-500/20 text-orange-300 font-bold px-4 py-1 rounded-full text-xs uppercase tracking-widest mb-6">
+                Our Mission
+              </div>
+              <h2 className="text-3xl sm:text-4xl font-black mb-6 leading-tight">
+                Built for <span className="text-orange-500">Tier-2 Cities</span>
+              </h2>
+              <p className="text-gray-400 text-lg leading-relaxed mb-8">
+                GO515 connects local restaurants with food lovers like you. We believe great food delivery shouldn't be limited to metros.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                    <Zap className="w-4 h-4 text-yellow-400" /> Late Night Loot
+                  </h4>
+                  <p className="text-xs text-gray-500">Exclusive flash sales every night.</p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-white mb-2 flex items-center gap-2">
+                    <User className="w-4 h-4 text-blue-400" /> No Login Required
+                  </h4>
+                  <p className="text-xs text-gray-500">Browse and checkout as a guest.</p>
+                </div>
+              </div>
+            </div>
+            
+            <div className="bg-white/5 p-8 rounded-3xl backdrop-blur-sm border border-white/10">
+              <h3 className="font-bold text-xl mb-6 text-white">Why Choose GO515?</h3>
+              <ul className="space-y-4">
+                {[
+                  "Real-time order tracking",
+                  "Direct restaurant prices (No markup)",
+                  "Support local businesses",
+                  "Fast & reliable delivery fleet"
+                ].map((item, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5" />
+                    <span className="text-gray-300 text-sm">{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* 8. LOCATION MODAL (Manual Typing Fix) */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
         <DialogContent className="sm:max-w-md rounded-2xl">
           <DialogHeader>
@@ -513,7 +582,7 @@ export default function Home() {
                 onChange={(e) => setManualLocation(e.target.value)}
                 className="h-11 rounded-xl"
               />
-              <Button size="icon" onClick={saveManualLocation} className="h-11 w-11 rounded-xl bg-black">
+              <Button size="icon" onClick={saveManualLocation} className="h-11 w-11 rounded-xl bg-black hover:bg-gray-800">
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </div>
