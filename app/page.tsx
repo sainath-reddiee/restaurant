@@ -457,26 +457,7 @@ export default function Home() {
             </ul>
           </div>
         </div>
-      </section>
-
-      <section className="mt-6 sm:mt-8 bg-gradient-to-br from-gray-900 to-gray-800 text-white rounded-xl sm:rounded-2xl p-6 sm:p-8 shadow-lg animate-in fade-in slide-in-from-bottom-4 delay-700">
-        <h2 className="text-2xl sm:text-3xl font-bold mb-4 sm:mb-6">Contact Us</h2>
-        <div className="grid sm:grid-cols-3 gap-4 sm:gap-6 text-sm sm:text-base">
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Phone</h3>
-            <p className="text-white/90">+91 9441414140</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Email</h3>
-            <p className="text-white/90">psainath123@gmail.com</p>
-          </div>
-          <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
-            <h3 className="font-semibold mb-2 text-orange-400">Location</h3>
-            <p className="text-white/90">PNR Kitchen Tadipatri</p>
-          </div>
-        </div>
-      </section>
-      
+      </section>      
     </div>
   );
 }
