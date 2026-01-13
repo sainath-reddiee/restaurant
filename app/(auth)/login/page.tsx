@@ -165,7 +165,7 @@ export default function LoginPage() {
             Welcome Back
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your Anantapur account
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
