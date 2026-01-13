@@ -468,11 +468,11 @@ export default function Home() {
           </div>
           <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
             <h3 className="font-semibold mb-2 text-orange-400">Email</h3>
-            <p className="text-white/90">support@anantapur.local</p>
+            <p className="text-white/90">psainath123@gmail.com</p>
           </div>
           <div className="bg-white/10 rounded-lg p-4 backdrop-blur-sm">
             <h3 className="font-semibold mb-2 text-orange-400">Location</h3>
-            <p className="text-white/90">Anantapur, Andhra Pradesh</p>
+            <p className="text-white/90">PNR Kitchen Tadipatri</p>
           </div>
         </div>
       </section>
