@@ -17,9 +17,21 @@ import {
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
-// --- LIVE UPDATES (Keep generic or fetch from DB in future) ---
+// --- EXPANSION-READY LOCATIONS (Anantapur District) ---
+const POPULAR_LOCATIONS = [
+  "Clock Tower, Anantapur",
+  "Sapthagiri Circle, Anantapur",
+  "JNTU College, Anantapur",
+  "Jesus Nagar, Anantapur",
+  "Tadipatri Bus Stand",
+  "Gandhi Nagar, Tadipatri",
+  "Sanjivini Hospital, Tadipatri",
+  "Yellanur Road, Tadipatri"
+];
+
+// --- LIVE TICKER UPDATES (Simulated Network Activity) ---
 const LIVE_UPDATES = [
-  "Someone nearby just ordered Chicken Biryani 🍗",
+  "Someone in Clock Tower just ordered Chicken Biryani 🍗",
   "New order placed for 2x Large Pizzas 🍕",
   "Raju's Kitchen is trending right now! 🔥",
   "A customer just saved ₹150 on a Mystery Box 🎁",
@@ -65,7 +77,7 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // UI State
+  // Location & UI State
   const [locationName, setLocationName] = useState<string>('Select Location');
   const [isLocating, setIsLocating] = useState(false);
   const [isLocationOpen, setIsLocationOpen] = useState(false);
@@ -101,9 +113,9 @@ export default function Home() {
     };
 
     fetchData();
-    detectLocation(); // Auto-detect on load
+    detectLocation(); // Auto-trigger real GPS on load
 
-    // Ticker Interval
+    // Ticker Animation Interval
     const interval = setInterval(() => {
       setCurrentUpdateIndex((prev) => (prev + 1) % LIVE_UPDATES.length);
     }, 4000);
@@ -119,12 +131,12 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
-  // --- REAL GPS LOGIC (Using OpenStreetMap) ---
+  // --- 🌍 REAL GPS REVERSE GEOCODING LOGIC ---
   const detectLocation = () => {
     setIsLocating(true);
     
     if (!('geolocation' in navigator)) {
-      setLocationName('Location Unavailable');
+      setLocationName('GPS Unavailable');
       setIsLocating(false);
       return;
     }
@@ -134,19 +146,23 @@ export default function Home() {
         try {
           const { latitude, longitude } = position.coords;
           
-          // Use OpenStreetMap Nominatim API (Free, no key required)
+          // Using OpenStreetMap Nominatim (Free, No Key Required)
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
           );
+          
+          if (!response.ok) throw new Error('Geocoding failed');
+          
           const data = await response.json();
-          
-          // Extract the most relevant city/area name
           const address = data.address;
-          const city = address.city || address.town || address.village || address.suburb || 'Unknown Location';
-          const area = address.road || address.neighbourhood || '';
           
-          // Set the formatted address
-          setLocationName(area ? `${area}, ${city}` : city);
+          // Construct a smart location string
+          const area = address.suburb || address.neighbourhood || address.road || '';
+          const city = address.city || address.town || address.village || address.county || '';
+          
+          const finalLocation = area ? `${area}, ${city}` : city;
+          setLocationName(finalLocation || 'Unknown Location');
+          
         } catch (error) {
           console.error('Error fetching address:', error);
           setLocationName('GPS Active (Address not found)');
@@ -155,12 +171,17 @@ export default function Home() {
         }
       },
       (error) => {
-        console.error('Location error:', error);
-        setLocationName('Select Location');
+        console.error('Location permission denied:', error);
+        // Don't change locationName if denied, keep "Select Location"
         setIsLocating(false);
       },
-      { enableHighAccuracy: true, timeout: 5000 }
+      { enableHighAccuracy: true, timeout: 8000 }
     );
+  };
+
+  const handleManualLocation = (loc: string) => {
+    setLocationName(loc);
+    setIsLocationOpen(false);
   };
 
   const mysteryItems = lootItems.filter(item => item.is_mystery);
@@ -169,7 +190,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans">
       
-      {/* 1. LIVE CRAVINGS TICKER (Generic/Real) */}
+      {/* 1. LIVE CRAVINGS TICKER (Expansion Ready) */}
       <div className="bg-black text-white text-[10px] sm:text-xs py-1.5 overflow-hidden relative z-50">
         <div className="container mx-auto px-4 flex items-center justify-center gap-2 animate-in fade-in duration-1000 key={currentUpdateIndex}">
           <Bell className="w-3 h-3 text-orange-500 animate-bounce" />
@@ -179,33 +200,35 @@ export default function Home() {
         </div>
       </div>
 
-      {/* 2. GLASS HEADER */}
+      {/* 2. GLASS HEADER (Sticky & Blurred) */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
             
-            {/* Logo & Location */}
-            <div className="flex items-center gap-3 flex-1">
-              <div className="w-10 h-10 bg-gradient-to-tr from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 transform hover:scale-105 transition-transform">
+            {/* Brand & Location Selector */}
+            <div className="flex items-center gap-3 flex-1 overflow-hidden">
+              <div className="w-10 h-10 bg-gradient-to-tr from-orange-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg shadow-orange-500/20 transform hover:scale-105 transition-transform flex-shrink-0">
                 <ChefHat className="w-6 h-6 text-white" />
               </div>
               
               <div 
-                className="flex flex-col cursor-pointer group" 
+                className="flex flex-col cursor-pointer group min-w-0" 
                 onClick={() => setIsLocationOpen(true)}
               >
                 <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest">
                   <Navigation className="w-3 h-3" />
-                  {isLocating ? 'Detecting...' : 'Delivering To'}
+                  {isLocating ? 'Locating...' : 'Delivering To'}
                 </div>
                 <div className="flex items-center gap-1 text-gray-900 text-sm font-bold group-hover:text-orange-600 transition-colors">
-                  <span className="truncate max-w-[140px] sm:max-w-[300px]">{locationName}</span>
-                  <ChevronDown className="w-3 h-3 text-gray-400" />
+                  <span className="truncate max-w-[150px] sm:max-w-[300px] block">
+                    {locationName}
+                  </span>
+                  <ChevronDown className="w-3 h-3 text-gray-400 flex-shrink-0" />
                 </div>
               </div>
             </div>
             
-            {/* Actions */}
+            {/* Right Actions */}
             <div className="flex items-center gap-2 sm:gap-3">
               {!user ? (
                 <>
@@ -213,7 +236,7 @@ export default function Home() {
                     variant="ghost" 
                     size="sm" 
                     onClick={() => router.push('/rider-signup')}
-                    className="hidden md:flex text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-full"
+                    className="hidden md:flex text-gray-600 hover:text-orange-600 hover:bg-orange-50 rounded-full text-xs sm:text-sm font-medium"
                   >
                     <Bike className="w-4 h-4 mr-2" />
                     Ride
@@ -222,7 +245,7 @@ export default function Home() {
                     variant="outline" 
                     size="sm" 
                     onClick={() => router.push('/partner')}
-                    className="hidden sm:flex border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800 rounded-full"
+                    className="hidden sm:flex border-orange-200 text-orange-700 hover:bg-orange-50 hover:text-orange-800 rounded-full text-xs sm:text-sm"
                   >
                     Partner
                   </Button>
@@ -250,28 +273,29 @@ export default function Home() {
         </div>
       </header>
 
-      {/* 3. PREMIUM HERO SECTION */}
-      <div className="relative bg-[#1a1c20] text-white pt-16 pb-24 px-4 rounded-b-[3rem] shadow-2xl overflow-hidden mb-10">
-        {/* Abstract "Food Shapes" Background */}
+      {/* 3. PREMIUM HERO SECTION (Aurora Effect) */}
+      <div className="relative bg-[#121212] text-white pt-16 pb-24 px-4 rounded-b-[3rem] shadow-2xl overflow-hidden mb-10">
+        {/* Animated "Aurora" Background */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-10 right-[5%] w-32 h-32 bg-orange-500/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-10 left-[10%] w-40 h-40 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-700"></div>
-          <Pizza className="absolute top-12 right-[15%] w-16 h-16 text-white/5 rotate-12" />
+          <div className="absolute top-[-50px] right-[-50px] w-96 h-96 bg-purple-600/30 rounded-full blur-[100px] animate-pulse"></div>
+          <div className="absolute bottom-[-50px] left-[-50px] w-96 h-96 bg-orange-600/20 rounded-full blur-[100px] animate-pulse delay-1000"></div>
+          {/* Floating Icons */}
+          <Pizza className="absolute top-12 right-[10%] w-16 h-16 text-white/5 rotate-12" />
           <Utensils className="absolute bottom-20 left-[5%] w-20 h-20 text-white/5 -rotate-12" />
         </div>
 
         <div className="relative z-10 container mx-auto text-center max-w-2xl">
-          <Badge className="bg-white/10 text-white border-white/20 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
-            🚀 Superfast Delivery in Your City
+          <Badge className="bg-white/10 text-white border-white/10 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
+            🚀 Superfast Delivery in Anantapur District
           </Badge>
-          <h1 className="text-4xl sm:text-5xl font-black mb-6 tracking-tight leading-tight">
+          <h1 className="text-4xl sm:text-6xl font-black mb-6 tracking-tight leading-tight drop-shadow-2xl">
             Craving something <br />
             <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-500">Delicious?</span>
           </h1>
           
           {/* Enhanced Search Bar */}
           <div className="relative max-w-lg mx-auto group">
-            <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-red-600 rounded-full blur opacity-30 group-hover:opacity-60 transition duration-500"></div>
+            <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-600 rounded-full blur opacity-25 group-hover:opacity-50 transition duration-500"></div>
             <div className="relative flex items-center bg-white rounded-full p-1.5 shadow-2xl">
               <div className="pl-4 pr-2 text-gray-400">
                 <Search className="w-5 h-5" />
@@ -281,9 +305,9 @@ export default function Home() {
                 placeholder="Biryani, Pizza, Cake..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none h-10 text-sm sm:text-base w-full"
+                className="flex-1 bg-transparent text-gray-900 placeholder-gray-400 outline-none h-11 text-sm sm:text-base w-full"
               />
-              <Button className="rounded-full px-6 h-10 bg-black hover:bg-gray-800 font-bold text-sm transition-transform active:scale-95">
+              <Button className="rounded-full px-6 h-11 bg-black hover:bg-gray-800 font-bold text-sm transition-transform active:scale-95">
                 Search
               </Button>
             </div>
@@ -293,20 +317,20 @@ export default function Home() {
 
       <main className="container mx-auto px-4 max-w-7xl -mt-16 relative z-20 space-y-12">
         
-        {/* 4. "WHAT'S ON YOUR MIND" (Category Slider) */}
+        {/* 4. CATEGORY SLIDER (Bento Style) */}
         <div className="bg-white rounded-2xl p-6 shadow-xl shadow-gray-200/50 border border-gray-100">
-          <h3 className="text-sm font-bold text-gray-400 uppercase tracking-widest mb-4">What's on your mind?</h3>
+          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4">Eat what makes you happy</h3>
           <div className="flex gap-4 sm:gap-8 overflow-x-auto no-scrollbar pb-2">
             {[
-              { name: 'Biryani', icon: '🥘', color: 'bg-orange-100' },
-              { name: 'Pizza', icon: '🍕', color: 'bg-red-100' },
-              { name: 'Burger', icon: '🍔', color: 'bg-yellow-100' },
-              { name: 'Shawarma', icon: '🥙', color: 'bg-green-100' },
-              { name: 'Desserts', icon: '🧁', color: 'bg-pink-100' },
-              { name: 'Drinks', icon: '🥤', color: 'bg-blue-100' },
+              { name: 'Biryani', icon: '🥘', color: 'bg-orange-50 text-orange-600' },
+              { name: 'Pizza', icon: '🍕', color: 'bg-red-50 text-red-600' },
+              { name: 'Burger', icon: '🍔', color: 'bg-yellow-50 text-yellow-600' },
+              { name: 'Shawarma', icon: '🥙', color: 'bg-green-50 text-green-600' },
+              { name: 'Desserts', icon: '🧁', color: 'bg-pink-50 text-pink-600' },
+              { name: 'Drinks', icon: '🥤', color: 'bg-blue-50 text-blue-600' },
             ].map((cat) => (
               <div key={cat.name} className="flex flex-col items-center gap-2 cursor-pointer group min-w-[70px]">
-                <div className={`${cat.color} w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                <div className={`${cat.color} w-16 h-16 rounded-2xl flex items-center justify-center text-3xl shadow-sm border border-gray-100 group-hover:scale-110 transition-transform duration-300`}>
                   {cat.icon}
                 </div>
                 <span className="text-xs font-bold text-gray-600 group-hover:text-gray-900">{cat.name}</span>
@@ -315,7 +339,7 @@ export default function Home() {
           </div>
         </div>
 
-        {/* 5. LOOT & MYSTERY SECTION (Bento Grid Style) */}
+        {/* 5. LOOT & MYSTERY SECTIONS (Side-by-Side Visuals) */}
         {(mysteryItems.length > 0 || liveLootItems.length > 0) && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             
@@ -326,18 +350,18 @@ export default function Home() {
                 <div className="relative z-10">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <Badge className="bg-purple-500 text-white border-0 mb-2">MYSTERY BOX</Badge>
+                      <Badge className="bg-purple-500 text-white border-0 mb-2 shadow-lg shadow-purple-500/50">MYSTERY BOX</Badge>
                       <h2 className="text-2xl font-bold text-white">Surprise Savings</h2>
-                      <p className="text-purple-200 text-sm">Get premium food at insane prices.</p>
+                      <p className="text-purple-200 text-sm mt-1">Get premium food at insane prices.</p>
                     </div>
                     <Gift className="w-12 h-12 text-purple-300 animate-bounce" />
                   </div>
                   
                   <div className="space-y-3">
                     {mysteryItems.slice(0, 2).map(item => (
-                      <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3 rounded-xl flex items-center justify-between hover:bg-white/20 transition-colors">
+                      <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3 rounded-xl flex items-center justify-between hover:bg-white/20 transition-colors border border-white/5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center text-xl">🎁</div>
+                          <div className="w-10 h-10 bg-purple-100/20 rounded-lg flex items-center justify-center text-xl backdrop-blur-sm">🎁</div>
                           <div>
                             <div className="text-white font-bold text-sm">{item.name}</div>
                             <div className="text-purple-200 text-xs">{item.restaurants.name}</div>
@@ -358,18 +382,18 @@ export default function Home() {
                 <div className="relative z-10">
                   <div className="flex justify-between items-start mb-6">
                     <div>
-                      <Badge className="bg-white text-orange-600 border-0 mb-2 animate-pulse">LIVE NOW</Badge>
+                      <Badge className="bg-white text-orange-600 border-0 mb-2 animate-pulse shadow-lg">LIVE NOW</Badge>
                       <h2 className="text-2xl font-bold text-white">Flash Deals</h2>
-                      <p className="text-orange-100 text-sm">Limited stock. Gone in minutes.</p>
+                      <p className="text-orange-100 text-sm mt-1">Limited stock. Gone in minutes.</p>
                     </div>
                     <Zap className="w-12 h-12 text-yellow-300" />
                   </div>
                   
                   <div className="space-y-3">
                     {liveLootItems.slice(0, 2).map(item => (
-                      <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3 rounded-xl flex items-center justify-between hover:bg-white/20 transition-colors">
+                      <div key={item.id} onClick={() => router.push(`/r/${item.restaurants.slug}`)} className="bg-white/10 backdrop-blur-md p-3 rounded-xl flex items-center justify-between hover:bg-white/20 transition-colors border border-white/5">
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center text-xl">⚡</div>
+                          <div className="w-10 h-10 bg-orange-100/20 rounded-lg flex items-center justify-center text-xl backdrop-blur-sm">⚡</div>
                           <div>
                             <div className="text-white font-bold text-sm">{item.name}</div>
                             <div className="text-orange-100 text-xs">{item.restaurants.name}</div>
@@ -388,7 +412,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. POPULAR RESTAURANTS LIST */}
+        {/* 6. POPULAR RESTAURANTS LIST (Dynamic Header) */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -412,7 +436,7 @@ export default function Home() {
               {filteredRestaurants.map((restaurant, index) => (
                 <Card
                   key={restaurant.id}
-                  className="group border-0 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden bg-white rounded-2xl cursor-pointer ring-1 ring-gray-100 hover:ring-orange-100"
+                  className="group border-0 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden bg-white rounded-2xl cursor-pointer ring-1 ring-gray-100 hover:ring-orange-100"
                   onClick={() => router.push(`/r/${restaurant.slug}`)}
                 >
                   <div className="relative h-48 overflow-hidden">
@@ -427,25 +451,27 @@ export default function Home() {
                         <ChefHat className="w-12 h-12 text-gray-300" />
                       </div>
                     )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent opacity-60"></div>
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80"></div>
                     
                     <div className="absolute bottom-4 left-4 text-white">
-                      <h3 className="font-bold text-xl mb-1 drop-shadow-md">{restaurant.name}</h3>
+                      <h3 className="font-bold text-xl mb-1 drop-shadow-md tracking-tight">{restaurant.name}</h3>
                       <div className="flex items-center gap-2 text-xs font-medium">
-                        <span className="bg-green-500 px-1.5 py-0.5 rounded text-white flex items-center gap-1">
+                        <span className="bg-green-500 px-2 py-0.5 rounded text-white flex items-center gap-1 shadow-sm">
                           ★ 4.2
                         </span>
-                        <span className="opacity-90">• 35 mins • ₹{restaurant.delivery_fee} Delivery</span>
+                        <span className="opacity-90 drop-shadow-sm">• 35 mins • ₹{restaurant.delivery_fee}</span>
                       </div>
                     </div>
                   </div>
                   
-                  {restaurant.free_delivery_threshold && (
-                    <div className="px-4 py-2 bg-blue-50 text-blue-700 text-xs font-bold flex items-center gap-2 border-t border-blue-100">
-                      <Gift className="w-3 h-3" />
-                      FREE Delivery over ₹{restaurant.free_delivery_threshold}
-                    </div>
-                  )}
+                  <div className="p-4 flex items-center justify-between">
+                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Fast Food • Biryani</span>
+                     {restaurant.free_delivery_threshold && (
+                        <div className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-full border border-blue-100">
+                           FREE DELIVERY
+                        </div>
+                     )}
+                  </div>
                 </Card>
               ))}
             </div>
@@ -453,7 +479,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 7. ABOUT SECTION (Generic / Scalable) */}
+      {/* 7. ABOUT SECTION (Scalable Branding) */}
       <section className="container mx-auto px-4 mt-24 mb-10">
         <div className="bg-[#1a1c20] rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
@@ -465,7 +491,7 @@ export default function Home() {
                 Built for <span className="text-orange-500">Tier-2 Cities</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                GO515 connects local restaurants with food lovers like you. We believe great food delivery shouldn't be limited to metros.
+                GO515 connects local restaurants in Anantapur District with food lovers like you. We believe great food delivery shouldn't be limited to metros.
               </p>
               
               <div className="grid grid-cols-2 gap-6">
@@ -504,7 +530,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. MANUAL LOCATION MODAL (Simplified) */}
+      {/* 8. MANUAL LOCATION MODAL (Includes Anantapur) */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -513,7 +539,7 @@ export default function Home() {
           <div className="space-y-4 pt-2">
             <Button 
               variant="outline" 
-              className="w-full justify-start text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100"
+              className="w-full justify-start text-orange-600 border-orange-200 bg-orange-50 hover:bg-orange-100 font-bold"
               onClick={() => {
                 detectLocation();
                 setIsLocationOpen(false);
@@ -523,8 +549,27 @@ export default function Home() {
               Use Current Location (GPS)
             </Button>
             
-            <div className="text-center text-xs text-gray-400 mt-2">
-              or enter location in profile settings
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or choose popular area</span>
+              </div>
+            </div>
+
+            <div className="grid gap-2 max-h-[200px] overflow-y-auto pr-2">
+              {POPULAR_LOCATIONS.map((loc) => (
+                <Button
+                  key={loc}
+                  variant="ghost"
+                  className="w-full justify-start font-normal"
+                  onClick={() => handleManualLocation(loc)}
+                >
+                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
+                  {loc}
+                </Button>
+              ))}
             </div>
           </div>
         </DialogContent>
