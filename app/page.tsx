@@ -17,25 +17,13 @@ import {
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
-// --- EXPANSION-READY LOCATIONS (Anantapur & Tadipatri) ---
-const POPULAR_LOCATIONS = [
-  "Clock Tower, Anantapur",
-  "JNTU University, Anantapur",
-  "Sapthagiri Circle, Anantapur",
-  "Ramtirtham, Anantapur",
-  "Tadipatri Bus Stand",
-  "Gandhi Nagar, Tadipatri",
-  "Sanjivini Hospital Area, Tadipatri",
-  "SKU University Campus"
-];
-
-// --- REGIONAL LIVE UPDATES ---
+// --- LIVE UPDATES (Keep generic or fetch from DB in future) ---
 const LIVE_UPDATES = [
-  "Someone in Clock Tower just ordered Chicken Biryani 🍗",
-  "New order from JNTU Hostel: 2x Large Pizzas 🍕",
-  "Raju's Kitchen (Tadipatri) is trending right now! 🔥",
-  "Siva in Anantapur just saved ₹150 on a Mystery Box 🎁",
-  "5 people are looking at Spicy Shawarma near Sapthagiri Circle 🥙"
+  "Someone nearby just ordered Chicken Biryani 🍗",
+  "New order placed for 2x Large Pizzas 🍕",
+  "Raju's Kitchen is trending right now! 🔥",
+  "A customer just saved ₹150 on a Mystery Box 🎁",
+  "5 people are browsing Spicy Shawarma 🥙"
 ];
 
 interface Restaurant {
@@ -131,31 +119,48 @@ export default function Home() {
     }
   }, [searchQuery, restaurants]);
 
+  // --- REAL GPS LOGIC (Using OpenStreetMap) ---
   const detectLocation = () => {
     setIsLocating(true);
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        async () => {
-          setTimeout(() => {
-            // In a real app, use Reverse Geocoding API here.
-            // For now, defaulting to the district hub.
-            setLocationName('Anantapur (GPS Detected)');
-            setIsLocating(false);
-          }, 1500);
-        },
-        () => {
-          setLocationName('Select Location');
+    
+    if (!('geolocation' in navigator)) {
+      setLocationName('Location Unavailable');
+      setIsLocating(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          
+          // Use OpenStreetMap Nominatim API (Free, no key required)
+          const response = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+          );
+          const data = await response.json();
+          
+          // Extract the most relevant city/area name
+          const address = data.address;
+          const city = address.city || address.town || address.village || address.suburb || 'Unknown Location';
+          const area = address.road || address.neighbourhood || '';
+          
+          // Set the formatted address
+          setLocationName(area ? `${area}, ${city}` : city);
+        } catch (error) {
+          console.error('Error fetching address:', error);
+          setLocationName('GPS Active (Address not found)');
+        } finally {
           setIsLocating(false);
         }
-      );
-    } else {
-      setIsLocating(false);
-    }
-  };
-
-  const handleManualLocation = (loc: string) => {
-    setLocationName(loc);
-    setIsLocationOpen(false);
+      },
+      (error) => {
+        console.error('Location error:', error);
+        setLocationName('Select Location');
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000 }
+    );
   };
 
   const mysteryItems = lootItems.filter(item => item.is_mystery);
@@ -164,7 +169,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans">
       
-      {/* 1. LIVE CRAVINGS TICKER (Regional) */}
+      {/* 1. LIVE CRAVINGS TICKER (Generic/Real) */}
       <div className="bg-black text-white text-[10px] sm:text-xs py-1.5 overflow-hidden relative z-50">
         <div className="container mx-auto px-4 flex items-center justify-center gap-2 animate-in fade-in duration-1000 key={currentUpdateIndex}">
           <Bell className="w-3 h-3 text-orange-500 animate-bounce" />
@@ -191,7 +196,7 @@ export default function Home() {
               >
                 <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 uppercase tracking-widest">
                   <Navigation className="w-3 h-3" />
-                  {isLocating ? 'Locating...' : 'Delivering To'}
+                  {isLocating ? 'Detecting...' : 'Delivering To'}
                 </div>
                 <div className="flex items-center gap-1 text-gray-900 text-sm font-bold group-hover:text-orange-600 transition-colors">
                   <span className="truncate max-w-[140px] sm:max-w-[300px]">{locationName}</span>
@@ -257,7 +262,7 @@ export default function Home() {
 
         <div className="relative z-10 container mx-auto text-center max-w-2xl">
           <Badge className="bg-white/10 text-white border-white/20 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
-            🚀 #1 Food Delivery in Anantapur District
+            🚀 Superfast Delivery in Your City
           </Badge>
           <h1 className="text-4xl sm:text-5xl font-black mb-6 tracking-tight leading-tight">
             Craving something <br />
@@ -383,7 +388,7 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. POPULAR RESTAURANTS LIST (Dynamic Header) */}
+        {/* 6. POPULAR RESTAURANTS LIST */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
@@ -448,7 +453,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 7. ABOUT SECTION (EXPANSION FOCUSED) */}
+      {/* 7. ABOUT SECTION (Generic / Scalable) */}
       <section className="container mx-auto px-4 mt-24 mb-10">
         <div className="bg-[#1a1c20] rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
@@ -460,7 +465,7 @@ export default function Home() {
                 Built for <span className="text-orange-500">Tier-2 Cities</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                GO515 connects local restaurants in Anantapur District with food lovers like you. We believe great food delivery shouldn't be limited to metros.
+                GO515 connects local restaurants with food lovers like you. We believe great food delivery shouldn't be limited to metros.
               </p>
               
               <div className="grid grid-cols-2 gap-6">
@@ -499,7 +504,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 8. MANUAL LOCATION MODAL */}
+      {/* 8. MANUAL LOCATION MODAL (Simplified) */}
       <Dialog open={isLocationOpen} onOpenChange={setIsLocationOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
@@ -518,27 +523,8 @@ export default function Home() {
               Use Current Location (GPS)
             </Button>
             
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or choose popular area</span>
-              </div>
-            </div>
-
-            <div className="grid gap-2">
-              {POPULAR_LOCATIONS.map((loc) => (
-                <Button
-                  key={loc}
-                  variant="ghost"
-                  className="w-full justify-start font-normal"
-                  onClick={() => handleManualLocation(loc)}
-                >
-                  <MapPin className="w-4 h-4 mr-2 text-gray-400" />
-                  {loc}
-                </Button>
-              ))}
+            <div className="text-center text-xs text-gray-400 mt-2">
+              or enter location in profile settings
             </div>
           </div>
         </DialogContent>
