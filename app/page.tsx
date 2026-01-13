@@ -17,23 +17,25 @@ import {
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
-// --- TADIPATRI LOCATIONS (Custom Data) ---
+// --- EXPANSION-READY LOCATIONS (Anantapur & Tadipatri) ---
 const POPULAR_LOCATIONS = [
-  "JNTU Engineering College",
+  "Clock Tower, Anantapur",
+  "JNTU University, Anantapur",
+  "Sapthagiri Circle, Anantapur",
+  "Ramtirtham, Anantapur",
   "Tadipatri Bus Stand",
-  "Gandhi Nagar",
-  "Railway Station Road",
-  "Yellanur Road",
-  "Sanjivini Hospital Area"
+  "Gandhi Nagar, Tadipatri",
+  "Sanjivini Hospital Area, Tadipatri",
+  "SKU University Campus"
 ];
 
-// --- FAKE LIVE ORDERS (For the Ticker) ---
+// --- REGIONAL LIVE UPDATES ---
 const LIVE_UPDATES = [
-  "Someone in Gandhi Nagar just ordered Chicken Biryani 🍗",
+  "Someone in Clock Tower just ordered Chicken Biryani 🍗",
   "New order from JNTU Hostel: 2x Large Pizzas 🍕",
-  "Raju's Kitchen is trending right now! 🔥",
-  "Siva just saved ₹150 on a Mystery Box 🎁",
-  "3 people are looking at Spicy Shawarma 🥙"
+  "Raju's Kitchen (Tadipatri) is trending right now! 🔥",
+  "Siva in Anantapur just saved ₹150 on a Mystery Box 🎁",
+  "5 people are looking at Spicy Shawarma near Sapthagiri Circle 🥙"
 ];
 
 interface Restaurant {
@@ -135,7 +137,9 @@ export default function Home() {
       navigator.geolocation.getCurrentPosition(
         async () => {
           setTimeout(() => {
-            setLocationName('Tadipatri (GPS Detected)');
+            // In a real app, use Reverse Geocoding API here.
+            // For now, defaulting to the district hub.
+            setLocationName('Anantapur (GPS Detected)');
             setIsLocating(false);
           }, 1500);
         },
@@ -160,17 +164,17 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#f8f9fa] pb-20 font-sans">
       
-      {/* 1. LIVE CRAVINGS TICKER (The "FOMO" Bar) */}
+      {/* 1. LIVE CRAVINGS TICKER (Regional) */}
       <div className="bg-black text-white text-[10px] sm:text-xs py-1.5 overflow-hidden relative z-50">
         <div className="container mx-auto px-4 flex items-center justify-center gap-2 animate-in fade-in duration-1000 key={currentUpdateIndex}">
           <Bell className="w-3 h-3 text-orange-500 animate-bounce" />
-          <span className="font-medium tracking-wide">
+          <span className="font-medium tracking-wide truncate">
             {LIVE_UPDATES[currentUpdateIndex]}
           </span>
         </div>
       </div>
 
-      {/* 2. GLASS HEADER (RESTORED RIDER BUTTON) */}
+      {/* 2. GLASS HEADER */}
       <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl border-b border-gray-100 shadow-sm transition-all duration-300">
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between gap-4">
@@ -253,7 +257,7 @@ export default function Home() {
 
         <div className="relative z-10 container mx-auto text-center max-w-2xl">
           <Badge className="bg-white/10 text-white border-white/20 backdrop-blur-md mb-6 px-4 py-1.5 text-xs font-medium rounded-full hover:bg-white/20 transition-colors cursor-default">
-            🚀 Superfast Delivery in Tadipatri
+            🚀 #1 Food Delivery in Anantapur District
           </Badge>
           <h1 className="text-4xl sm:text-5xl font-black mb-6 tracking-tight leading-tight">
             Craving something <br />
@@ -379,12 +383,12 @@ export default function Home() {
           </div>
         )}
 
-        {/* 6. POPULAR RESTAURANTS LIST */}
+        {/* 6. POPULAR RESTAURANTS LIST (Dynamic Header) */}
         <div>
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-yellow-500 fill-yellow-500" />
-              Popular in Tadipatri
+              Popular in Your Area
             </h2>
           </div>
 
@@ -444,7 +448,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* 7. ABOUT SECTION (RESTORED & RESTYLED) */}
+      {/* 7. ABOUT SECTION (EXPANSION FOCUSED) */}
       <section className="container mx-auto px-4 mt-24 mb-10">
         <div className="bg-[#1a1c20] rounded-[2.5rem] p-8 sm:p-12 text-white relative overflow-hidden shadow-2xl">
           <div className="relative z-10 grid md:grid-cols-2 gap-12 items-center">
@@ -456,7 +460,7 @@ export default function Home() {
                 Built for <span className="text-orange-500">Tier-2 Cities</span>
               </h2>
               <p className="text-gray-400 text-lg leading-relaxed mb-8">
-                GO515 connects local restaurants in Anantapur & Tadipatri with food lovers like you. We believe great food delivery shouldn't be limited to metros.
+                GO515 connects local restaurants in Anantapur District with food lovers like you. We believe great food delivery shouldn't be limited to metros.
               </p>
               
               <div className="grid grid-cols-2 gap-6">
