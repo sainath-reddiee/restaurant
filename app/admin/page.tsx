@@ -14,19 +14,25 @@ import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
-import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield } from 'lucide-react';
+import { Loader2, Plus, Store, DollarSign, Package, Trash2, Shield, Wallet, RefreshCw, Pencil, User, Bike, CheckCircle, XCircle } from 'lucide-react';
+import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { formatPrice } from '@/lib/format';
 
 export default function AdminDashboard() {
-  const { profile, loading: authLoading } = useAuth();
+  const { profile, loading: authLoading, signOut } = useAuth();
   const router = useRouter();
   const { toast } = useToast();
   const [restaurants, setRestaurants] = useState<Restaurant[]>([]);
+  const [riders, setRiders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editingRestaurantId, setEditingRestaurantId] = useState<string | null>(null);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [totalOrders, setTotalOrders] = useState(0);
+  const [activeTab, setActiveTab] = useState<'restaurants' | 'riders'>('restaurants');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -36,6 +42,8 @@ export default function AdminDashboard() {
     delivery_fee: 40,
     free_delivery_threshold: '',
     slug: '',
+    is_active: true,
+    gst_enabled: false,
   });
 
   // FIX: Proper authentication check with redirect to login or homepage
@@ -52,11 +60,12 @@ export default function AdminDashboard() {
   }, [authLoading, profile, router]);
 
   useEffect(() => {
-    if (profile?.role === 'SUPER_ADMIN') {
+    if (profile?.role === 'SUPER_ADMIN' && loading) {
       fetchRestaurants();
+      fetchRiders();
       fetchStats();
     }
-  }, [profile]);
+  }, [profile, loading]);
 
   const fetchRestaurants = async () => {
     const { data, error } = await supabase
@@ -70,39 +79,59 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
-  const fetchStats = async () => {
-    const { data: orders } = await supabase
-      .from('orders')
-      .select('net_profit')
-      .returns<Array<{ net_profit: number }>>();
+  const fetchRiders = async () => {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('role', 'RIDER')
+      .order('created_at', { ascending: false });
 
-    if (orders) {
-      const revenue = orders.reduce((sum, order) => sum + order.net_profit, 0);
-      setTotalRevenue(revenue);
-      setTotalOrders(orders.length);
+    if (data) {
+      setRiders(data);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const fetchStats = async () => {
+    const { count } = await supabase
+      .from('orders')
+      .select('*', { count: 'exact', head: true });
 
-    const insertData = {
-      name: formData.name,
-      owner_phone: formData.owner_phone.startsWith('+91') ? formData.owner_phone : `+91${formData.owner_phone}`,
-      upi_id: formData.upi_id,
-      tech_fee: formData.tech_fee,
-      delivery_fee: formData.delivery_fee,
-      free_delivery_threshold: formData.free_delivery_threshold ? parseInt(formData.free_delivery_threshold) : null,
-      slug: formData.slug,
-      is_active: true,
-    };
+    const { data } = await supabase
+      .from('orders')
+      .select('net_profit');
 
-    // @ts-ignore
-    const { data, error } = await supabase
-      .from('restaurants')
-      .insert(insertData)
-      .select()
-      .single();
+    if (data) {
+      const revenue = data.reduce((sum, order) => sum + (order.net_profit || 0), 0);
+      setTotalRevenue(revenue);
+    }
+
+    if (count !== null) {
+      setTotalOrders(count);
+    }
+  };
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await fetchRestaurants();
+      await fetchRiders();
+      await fetchStats();
+      toast({
+        title: 'Refreshed',
+        description: 'Dashboard data updated',
+      });
+    } catch (error) {
+      console.error('Refresh error:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const approveRider = async (riderId: string, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_verified: true })
+      .eq('id', riderId);
 
     if (error) {
       toast({
@@ -113,9 +142,136 @@ export default function AdminDashboard() {
     } else {
       toast({
         title: 'Success',
-        description: 'Restaurant onboarded successfully!',
+        description: `${name} has been approved as a rider`,
+      });
+      fetchRiders();
+    }
+  };
+
+  const rejectRider = async (riderId: string, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ role: 'CUSTOMER', is_verified: false })
+      .eq('id', riderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name}'s rider application has been rejected`,
+      });
+      fetchRiders();
+    }
+  };
+
+  const toggleRiderStatus = async (riderId: string, currentStatus: boolean, name: string) => {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ is_verified: !currentStatus })
+      .eq('id', riderId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: `${name} has been ${!currentStatus ? 'activated' : 'deactivated'}`,
+      });
+      fetchRiders();
+    }
+  };
+
+  const handleOpenCreateDialog = () => {
+    setEditMode(false);
+    setEditingRestaurantId(null);
+    setFormData({
+      name: '',
+      owner_phone: '',
+      upi_id: '',
+      tech_fee: 10,
+      delivery_fee: 40,
+      free_delivery_threshold: '',
+      slug: '',
+      is_active: true,
+      gst_enabled: false,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleOpenEditDialog = (restaurant: Restaurant) => {
+    setEditMode(true);
+    setEditingRestaurantId(restaurant.id);
+    setFormData({
+      name: restaurant.name,
+      owner_phone: restaurant.owner_phone,
+      upi_id: restaurant.upi_id,
+      tech_fee: restaurant.tech_fee,
+      delivery_fee: restaurant.delivery_fee,
+      free_delivery_threshold: restaurant.free_delivery_threshold?.toString() || '',
+      slug: restaurant.slug,
+      is_active: restaurant.is_active,
+      gst_enabled: restaurant.gst_enabled || false,
+    });
+    setDialogOpen(true);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const dataToSave = {
+      name: formData.name,
+      owner_phone: formData.owner_phone.startsWith('+91') ? formData.owner_phone : `+91${formData.owner_phone}`,
+      upi_id: formData.upi_id,
+      tech_fee: formData.tech_fee,
+      delivery_fee: formData.delivery_fee,
+      free_delivery_threshold: formData.free_delivery_threshold ? parseInt(formData.free_delivery_threshold) : null,
+      slug: formData.slug,
+      is_active: formData.is_active,
+      gst_enabled: formData.gst_enabled,
+    };
+
+    let error;
+
+    if (editMode && editingRestaurantId) {
+      // Update existing restaurant
+      const result = await supabase
+        .from('restaurants')
+        .update(dataToSave)
+        .eq('id', editingRestaurantId);
+      error = result.error;
+    } else {
+      // Create new restaurant
+      const result = await supabase
+        .from('restaurants')
+        .insert(dataToSave)
+        .select()
+        .single();
+      error = result.error;
+    }
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: editMode ? 'Restaurant updated successfully!' : 'Restaurant onboarded successfully!',
       });
       setDialogOpen(false);
+      setEditMode(false);
+      setEditingRestaurantId(null);
       setFormData({
         name: '',
         owner_phone: '',
@@ -124,6 +280,8 @@ export default function AdminDashboard() {
         delivery_fee: 40,
         free_delivery_threshold: '',
         slug: '',
+        is_active: true,
+        gst_enabled: false,
       });
       fetchRestaurants();
       fetchStats();
@@ -203,13 +361,48 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       <div className="bg-gradient-to-r from-amber-600 to-orange-600 shadow-xl border-b border-amber-700">
         <div className="container mx-auto px-6 py-6">
-          <div className="flex items-center gap-4 mb-2">
-            <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
-              <Shield className="h-8 w-8 text-white" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-white/10 backdrop-blur-sm rounded-xl">
+                <Shield className="h-8 w-8 text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-white tracking-tight">Admin Command Center</h1>
+                <p className="text-amber-100 mt-1">Super Admin Dashboard - Full Platform Control</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight">Admin Command Center</h1>
-              <p className="text-amber-100 mt-1">Super Admin Dashboard - Full Platform Control</p>
+            <div className="flex items-center gap-4">
+              <Button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm"
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Link href="/admin/finance">
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
+                  <Wallet className="h-4 w-4 mr-2" />
+                  Finance
+                </Button>
+              </Link>
+              <Link href="/profile">
+                <Button className="bg-white/20 hover:bg-white/30 text-white border-white/30 backdrop-blur-sm">
+                  <User className="h-4 w-4 mr-2" />
+                  Profile
+                </Button>
+              </Link>
+              <div className="text-right">
+                <p className="text-white font-semibold">{profile?.full_name || 'Admin'}</p>
+                <p className="text-amber-100 text-sm">{profile?.phone}</p>
+              </div>
+              <Button
+                onClick={signOut}
+                variant="outline"
+                className="bg-white/10 hover:bg-white/20 text-white border-white/30 backdrop-blur-sm"
+              >
+                Logout
+              </Button>
             </div>
           </div>
         </div>
@@ -219,18 +412,20 @@ export default function AdminDashboard() {
         <div className="flex justify-between items-center mb-8">
           <div>
           </div>
+          <Button
+            onClick={handleOpenCreateDialog}
+            className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            Onboard Restaurant
+          </Button>
+
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white shadow-lg">
-                <Plus className="mr-2 h-4 w-4" />
-                Onboard Restaurant
-              </Button>
-            </DialogTrigger>
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
-                <DialogTitle>Onboard New Restaurant</DialogTitle>
+                <DialogTitle>{editMode ? 'Edit Restaurant' : 'Onboard New Restaurant'}</DialogTitle>
                 <DialogDescription>
-                  Add a new restaurant to the platform with custom configuration
+                  {editMode ? 'Update restaurant details and configuration' : 'Add a new restaurant to the platform with custom configuration'}
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit} className="space-y-4">
@@ -310,7 +505,26 @@ export default function AdminDashboard() {
                   />
                   <p className="text-xs text-muted-foreground">Minimum order for free delivery</p>
                 </div>
-                <Button type="submit" className="w-full">Create Restaurant</Button>
+
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between space-x-4">
+                    <div className="flex-1 space-y-1">
+                      <Label htmlFor="gst_enabled" className="text-base font-medium">
+                        Enable GST Calculations
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Only enable for restaurants with turnover above GST threshold (₹20L goods / ₹40L services)
+                      </p>
+                    </div>
+                    <Switch
+                      id="gst_enabled"
+                      checked={formData.gst_enabled}
+                      onCheckedChange={(checked) => setFormData({ ...formData, gst_enabled: checked })}
+                    />
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full">{editMode ? 'Update Restaurant' : 'Create Restaurant'}</Button>
               </form>
             </DialogContent>
           </Dialog>
@@ -355,12 +569,30 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
-          <CardHeader>
-            <CardTitle className="text-white">Restaurants</CardTitle>
-            <CardDescription className="text-slate-400">Manage all onboarded restaurants</CardDescription>
-          </CardHeader>
-          <CardContent>
+        <div className="flex gap-4 mb-6">
+          <Button
+            onClick={() => setActiveTab('restaurants')}
+            className={activeTab === 'restaurants' ? 'bg-orange-500' : 'bg-slate-700'}
+          >
+            <Store className="mr-2 h-4 w-4" />
+            Restaurants
+          </Button>
+          <Button
+            onClick={() => setActiveTab('riders')}
+            className={activeTab === 'riders' ? 'bg-orange-500' : 'bg-slate-700'}
+          >
+            <Bike className="mr-2 h-4 w-4" />
+            Riders ({riders.filter(r => !r.is_verified).length} pending)
+          </Button>
+        </div>
+
+        {activeTab === 'restaurants' && (
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-white">Restaurants</CardTitle>
+              <CardDescription className="text-slate-400">Manage all onboarded restaurants</CardDescription>
+            </CardHeader>
+            <CardContent>
             <Table>
               <TableHeader>
                 <TableRow className="border-slate-700 hover:bg-slate-700/50">
@@ -395,12 +627,21 @@ export default function AdminDashboard() {
                       </div>
                     </TableCell>
                     <TableCell>
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleOpenEditDialog(restaurant)}
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/20"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild>
+                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-900/20">
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </AlertDialogTrigger>
                         <AlertDialogContent>
                           <AlertDialogHeader>
                             <AlertDialogTitle>Delete Restaurant</AlertDialogTitle>
@@ -419,6 +660,7 @@ export default function AdminDashboard() {
                           </AlertDialogFooter>
                         </AlertDialogContent>
                       </AlertDialog>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -426,6 +668,92 @@ export default function AdminDashboard() {
             </Table>
           </CardContent>
         </Card>
+        )}
+
+        {activeTab === 'riders' && (
+          <Card className="bg-slate-800/50 border-slate-700 backdrop-blur shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-white">Riders Management</CardTitle>
+              <CardDescription className="text-slate-400">Approve or manage rider applications</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-slate-700 hover:bg-slate-700/50">
+                    <TableHead className="text-slate-300">Name</TableHead>
+                    <TableHead className="text-slate-300">Phone</TableHead>
+                    <TableHead className="text-slate-300">Vehicle Number</TableHead>
+                    <TableHead className="text-slate-300">Status</TableHead>
+                    <TableHead className="text-slate-300">Online</TableHead>
+                    <TableHead className="text-slate-300">Wallet Balance</TableHead>
+                    <TableHead className="text-slate-300">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {riders.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={7} className="text-center text-slate-400 py-8">
+                        No rider applications yet
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    riders.map((rider) => (
+                      <TableRow key={rider.id} className="border-slate-700 hover:bg-slate-700/30">
+                        <TableCell className="font-medium text-white">{rider.full_name || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-300">{rider.phone || 'N/A'}</TableCell>
+                        <TableCell className="text-slate-300">{rider.vehicle_number || 'N/A'}</TableCell>
+                        <TableCell>
+                          <Badge variant={rider.is_verified ? 'default' : 'secondary'}>
+                            {rider.is_verified ? 'Approved' : 'Pending'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={rider.is_rider_online ? 'default' : 'outline'}>
+                            {rider.is_rider_online ? 'Online' : 'Offline'}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-slate-300">
+                          {formatPrice(rider.rider_wallet_balance || 0)}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            {!rider.is_verified ? (
+                              <>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => approveRider(rider.id, rider.full_name || 'Rider')}
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-900/20"
+                                >
+                                  <CheckCircle className="h-4 w-4 mr-1" />
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => rejectRider(rider.id, rider.full_name || 'Rider')}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                                >
+                                  <XCircle className="h-4 w-4 mr-1" />
+                                  Reject
+                                </Button>
+                              </>
+                            ) : (
+                              <Switch
+                                checked={rider.is_verified}
+                                onCheckedChange={() => toggleRiderStatus(rider.id, rider.is_verified, rider.full_name || 'Rider')}
+                              />
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );

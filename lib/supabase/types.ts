@@ -2,6 +2,8 @@ export type UserRole = 'SUPER_ADMIN' | 'RESTAURANT' | 'CUSTOMER';
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'COOKING' | 'READY' | 'DELIVERED';
 export type PaymentMethod = 'PREPAID_UPI' | 'COD_CASH' | 'COD_UPI_SCAN';
 export type MysteryType = 'VEG' | 'NON_VEG' | 'ANY';
+export type WalletTransactionType = 'FEE_DEDUCTION' | 'WALLET_RECHARGE';
+export type WalletTransactionStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface Profile {
   id: string;
@@ -22,6 +24,15 @@ export interface Restaurant {
   free_delivery_threshold: number | null;
   slug: string;
   created_at: string;
+  image_url: string | null;
+  rating_avg: number;
+  rating_count: number;
+  credit_balance: number;
+  min_balance_limit: number;
+  gst_number: string | null;
+  is_gst_registered: boolean;
+  food_gst_rate: number;
+  gst_enabled: boolean;
 }
 
 export interface MenuItem {
@@ -37,6 +48,9 @@ export interface MenuItem {
   is_mystery: boolean;
   mystery_type: MysteryType | null;
   is_available: boolean;
+  is_veg: boolean;
+  loot_discount_percentage: number | null;
+  loot_description: string | null;
   created_at: string;
 }
 
@@ -60,13 +74,21 @@ export interface OrderItem {
 export interface Order {
   id: string;
   short_id: string;
+  invoice_number: string | null;
   restaurant_id: string;
   customer_id: string;
+  rider_id?: string | null;
   status: OrderStatus;
   payment_method: PaymentMethod;
   voice_note_url: string | null;
   gps_coordinates: string | null;
   delivery_address: string;
+  subtotal_before_gst: number;
+  food_gst_amount: number;
+  delivery_gst_amount: number;
+  total_gst_amount: number;
+  cgst_amount: number;
+  sgst_amount: number;
   total_amount: number;
   delivery_fee_charged: number;
   coupon_code: string | null;
@@ -75,6 +97,29 @@ export interface Order {
   items: OrderItem[];
   created_at: string;
   updated_at: string;
+}
+
+export interface Review {
+  id: string;
+  restaurant_id: string;
+  customer_id: string;
+  order_id: string | null;
+  rating: number;
+  review_text: string | null;
+  created_at: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  restaurant_id: string;
+  amount: number;
+  type: WalletTransactionType;
+  status: WalletTransactionStatus;
+  proof_image_url: string | null;
+  notes: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  created_at: string;
 }
 
 export interface Database {
@@ -104,6 +149,11 @@ export interface Database {
         Row: Order;
         Insert: Omit<Order, 'id' | 'created_at' | 'updated_at'>;
         Update: Partial<Omit<Order, 'id' | 'created_at' | 'updated_at'>>;
+      };
+      wallet_transactions: {
+        Row: WalletTransaction;
+        Insert: Omit<WalletTransaction, 'id' | 'created_at'>;
+        Update: Partial<Omit<WalletTransaction, 'id' | 'created_at'>>;
       };
     };
   };

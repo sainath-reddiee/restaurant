@@ -18,7 +18,8 @@ import {
   HeadphonesIcon,
   LogOut,
   ChevronRight,
-  AlertCircle
+  AlertCircle,
+  Package
 } from 'lucide-react';
 import { formatPrice } from '@/lib/format';
 
@@ -39,9 +40,16 @@ interface Order {
   items: any;
 }
 
+interface Restaurant {
+  id: string;
+  credit_balance: number;
+  name: string;
+}
+
 export default function ProfilePage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [email, setEmail] = useState<string>('');
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,6 +78,19 @@ export default function ProfilePage() {
 
       if (profileData) {
         setProfile(profileData);
+
+        // If restaurant user, fetch restaurant data
+        if (profileData.role === 'RESTAURANT') {
+          const { data: restaurantData } = await supabase
+            .from('restaurants')
+            .select('id, credit_balance, name')
+            .eq('owner_phone', profileData.phone)
+            .maybeSingle();
+
+          if (restaurantData) {
+            setRestaurant(restaurantData);
+          }
+        }
       }
 
       const { data: ordersData } = await supabase
@@ -171,7 +192,7 @@ export default function ProfilePage() {
                   </div>
                 </div>
                 <Badge variant="secondary" className="self-start">
-                  Student
+                  {profile.role === 'CUSTOMER' || profile.role === 'STUDENT' ? 'Customer' : profile.role}
                 </Badge>
               </div>
             </CardContent>
@@ -181,27 +202,40 @@ export default function ProfilePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wallet className="h-5 w-5" />
-                Vello Wallet
+                {profile.role === 'RESTAURANT' ? 'Partner Wallet' : profile.role === 'SUPER_ADMIN' ? 'Admin Wallet' : 'Vello Wallet'}
               </CardTitle>
               <CardDescription>
-                Your wallet balance for refunds and rewards
+                {profile.role === 'RESTAURANT'
+                  ? 'Your restaurant earnings and balance'
+                  : profile.role === 'SUPER_ADMIN'
+                  ? 'Admin account wallet balance'
+                  : 'Your wallet balance for refunds and rewards'}
               </CardDescription>
             </CardHeader>
             <CardContent>
               <div className="text-center py-6 bg-gradient-to-br from-slate-50 to-slate-100 rounded-lg border border-slate-200">
                 <p className="text-sm text-slate-600 mb-2">Available Balance</p>
                 <p className="text-4xl font-bold text-slate-900">
-                  {formatPrice(profile.wallet_balance)}
+                  {profile.role === 'RESTAURANT'
+                    ? formatPrice(restaurant?.credit_balance || 0)
+                    : formatPrice(profile.wallet_balance)}
                 </p>
+                {profile.role === 'RESTAURANT' && restaurant && (
+                  <p className="text-xs text-slate-500 mt-2">
+                    Restaurant: {restaurant.name}
+                  </p>
+                )}
               </div>
 
               <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-lg">
                 <p className="text-sm text-blue-900 leading-relaxed">
                   <strong>How does the wallet work?</strong>
                   <br />
-                  Your wallet balance can be used to reduce payment amounts at checkout.
-                  Money is added to your wallet through order refunds and platform rewards only.
-                  You cannot directly add money to your wallet.
+                  {profile.role === 'RESTAURANT' ? (
+                    <>Your wallet contains earnings from completed orders. Payment settlements and withdrawals can be managed from your partner dashboard.</>
+                  ) : (
+                    <>Your wallet balance can be used to reduce payment amounts at checkout. Money is added to your wallet through order refunds and platform rewards only. You cannot directly add money to your wallet.</>
+                  )}
                 </p>
               </div>
             </CardContent>
@@ -212,18 +246,74 @@ export default function ProfilePage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Button
-                variant="ghost"
-                className="w-full justify-between hover:bg-slate-100"
-                onClick={() => setShowOrders(!showOrders)}
-              >
-                <span className="flex items-center gap-3">
-                  <History className="h-5 w-5" />
-                  Order History
-                  <Badge variant="secondary">{orders.length}</Badge>
-                </span>
-                <ChevronRight className={`h-5 w-5 transition-transform ${showOrders ? 'rotate-90' : ''}`} />
-              </Button>
+              {profile.role === 'RESTAURANT' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Package className="h-5 w-5" />
+                      Restaurant Dashboard
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/partner/wallet')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Wallet className="h-5 w-5" />
+                      Wallet & Transactions
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Separator />
+                </>
+              )}
+              {profile.role === 'SUPER_ADMIN' && (
+                <>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/admin')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Package className="h-5 w-5" />
+                      Admin Dashboard
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-between hover:bg-slate-100"
+                    onClick={() => router.push('/admin/finance')}
+                  >
+                    <span className="flex items-center gap-3">
+                      <Wallet className="h-5 w-5" />
+                      Finance Management
+                    </span>
+                    <ChevronRight className="h-5 w-5" />
+                  </Button>
+                  <Separator />
+                </>
+              )}
+              {(profile.role === 'CUSTOMER' || profile.role === 'STUDENT') && (
+                <Button
+                  variant="ghost"
+                  className="w-full justify-between hover:bg-slate-100"
+                  onClick={() => setShowOrders(!showOrders)}
+                >
+                  <span className="flex items-center gap-3">
+                    <History className="h-5 w-5" />
+                    Order History
+                    <Badge variant="secondary">{orders.length}</Badge>
+                  </span>
+                  <ChevronRight className={`h-5 w-5 transition-transform ${showOrders ? 'rotate-90' : ''}`} />
+                </Button>
+              )}
 
               {showOrders && (
                 <ScrollArea className="h-[300px] w-full rounded-md border p-4">

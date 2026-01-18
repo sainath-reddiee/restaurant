@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { signInWithEmail, resetPassword } from '@/lib/supabase/auth';
+import { supabase } from '@/lib/supabase/client';
 import { Mail, ArrowRight, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -22,11 +23,14 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
+    console.log('🔐 Starting login process...');
+    console.log('📧 Email:', email);
+
     try {
       const { data, error } = await signInWithEmail(email, password);
 
       if (error) {
-        console.error('Login error:', error);
+        console.error('❌ Login error:', error);
         toast({
           title: 'Login Failed',
           description: error.message || 'Invalid email or password. Please try again.',
@@ -37,7 +41,7 @@ export default function LoginPage() {
       }
 
       if (!data.user || !data.session) {
-        console.error('Login failed: No user data returned');
+        console.error('❌ Login failed: No user data returned');
         toast({
           title: 'Login Failed',
           description: 'Unable to sign in. Please try again.',
@@ -47,22 +51,66 @@ export default function LoginPage() {
         return;
       }
 
-      console.log('Login successful:', data.user.id);
+      console.log('✅ Login successful!');
+      console.log('👤 User ID:', data.user.id);
+      console.log('🎫 Session token length:', data.session.access_token?.length);
+      console.log('⏰ Session expires at:', new Date(data.session.expires_at! * 1000).toLocaleString());
 
       toast({
         title: 'Success',
         description: 'Signed in successfully!',
       });
 
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      console.log('⏳ Waiting for profile to load...');
 
-      router.refresh();
-      await new Promise(resolve => setTimeout(resolve, 500));
+      const userId = data.user.id;
 
-      const redirectPath = new URLSearchParams(window.location.search).get('redirect') || '/';
+      // Wait for profile to be created/loaded
+      let attempts = 0;
+      let profile = null;
+      while (attempts < 10) {
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .maybeSingle();
+
+        if (profileData) {
+          profile = profileData;
+          break;
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+        attempts++;
+      }
+
+      console.log('👤 Profile loaded:', profile);
+
+      // Determine redirect based on role
+      let redirectPath = '/';
+      if (profile) {
+        switch (profile.role) {
+          case 'SUPER_ADMIN':
+            redirectPath = '/admin';
+            break;
+          case 'RESTAURANT_OWNER':
+            redirectPath = '/partner';
+            break;
+          case 'RIDER':
+            redirectPath = '/rider/dashboard';
+            break;
+          case 'CUSTOMER':
+            redirectPath = '/';
+            break;
+          default:
+            redirectPath = '/';
+        }
+      }
+
+      console.log('🚀 Redirecting to:', redirectPath);
       router.push(redirectPath);
     } catch (error) {
-      console.error('Auth error:', error);
+      console.error('❌ Auth error:', error);
       toast({
         title: 'Error',
         description: 'Something went wrong. Please try again.',
@@ -117,7 +165,7 @@ export default function LoginPage() {
             Welcome Back
           </CardTitle>
           <CardDescription className="text-center">
-            Sign in to your Anantapur account
+            Sign in to your account
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">

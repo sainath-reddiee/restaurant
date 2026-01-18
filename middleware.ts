@@ -80,6 +80,12 @@ export async function middleware(req: NextRequest) {
       }
     }
 
+    if (path.startsWith('/rider')) {
+      if (role !== 'RIDER') {
+        return NextResponse.redirect(new URL('/join-rider', req.url))
+      }
+    }
+
     return res
   } catch (error) {
     console.error('Middleware error:', error);
@@ -89,5 +95,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/dashboard/:path*', '/profile/:path*'],
+  matcher: ['/admin/:path*', '/dashboard/:path*', '/profile/:path*', '/rider/:path*'],
 }
